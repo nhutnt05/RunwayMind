@@ -33,7 +33,8 @@ abstract contract AltAssetSystem is Test {
         s.token = token;
         vm.startPrank(admin_);
         s.registry = new ObligationRegistry(admin_);
-        s.policy = new PolicyEngine(admin_, address(token), IObligationRegistry(address(s.registry)), 14 days, 10_000e6, 7000);
+        s.policy =
+            new PolicyEngine(admin_, address(token), IObligationRegistry(address(s.registry)), 14 days, 10_000e6, 7000);
         s.treasury = new Treasury(
             token, IObligationRegistry(address(s.registry)), IPolicyEngine(address(s.policy)), admin_, true
         );
@@ -54,16 +55,17 @@ abstract contract AltAssetSystem is Test {
         returns (uint256 id)
     {
         vm.prank(admin_);
-        id = s.registry.createObligation(
-            ObligationInput({
-                recipient: recipient,
-                amount: amount,
-                firstDueDate: due,
-                interval: 0,
-                maxOccurrences: 1,
-                category: Category.PAYROLL,
-                metadataHash: bytes32(0)
-            })
-        );
+        id = s.registry
+            .createObligation(
+                ObligationInput({
+                    recipient: recipient,
+                    amount: amount,
+                    firstDueDate: due,
+                    interval: 0,
+                    maxOccurrences: 1,
+                    category: Category.PAYROLL,
+                    metadataHash: bytes32(0)
+                })
+            );
     }
 }

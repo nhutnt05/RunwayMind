@@ -35,6 +35,7 @@ export function createChainPublicClient(cfg: Pick<AgentConfig, 'CHAIN_ID' | 'FUJ
   return createPublicClient({
     chain: chainFor(cfg.CHAIN_ID, cfg.FUJI_RPC_URL),
     transport: transportFor(cfg.FUJI_RPC_URL, cfg.FUJI_RPC_URL_FALLBACK),
+    pollingInterval: 1_000, // receipts within ~1 block on Fuji (approve -> Snowtrace <= 10 s, docs/05 §13)
   }) as PublicClient;
 }
 

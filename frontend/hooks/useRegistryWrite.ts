@@ -33,6 +33,8 @@ export const REGISTRY_WRITE_INVALIDATES = [['obligations'], ['overview'], ['cash
  */
 export function useRegistryWrite() {
   const qc = useQueryClient();
+  const invalidate = () =>
+    Promise.all(REGISTRY_WRITE_INVALIDATES.map((queryKey) => qc.invalidateQueries({ queryKey: [...queryKey] })));
 
   return useMutation<RegistryWriteResult, Error, RegistryWriteInput>({
     mutationFn: async ({ title, kind, functionName, prepare }) => {
@@ -98,8 +100,4 @@ export function useRegistryWrite() {
       }
     },
   });
-
-  async function invalidate() {
-    await Promise.all(REGISTRY_WRITE_INVALIDATES.map((queryKey) => qc.invalidateQueries({ queryKey: [...queryKey] })));
-  }
 }

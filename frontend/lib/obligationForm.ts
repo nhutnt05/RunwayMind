@@ -6,7 +6,10 @@ import { z } from 'zod';
 import {
   CategorySchema,
   CreateObligationRequestSchema,
+  UpdateObligationRequestSchema,
+  formatUsdcPlain,
   parseUsdc,
+  toIsoDateUtc,
   toUtcMidnight,
   type CreateObligationRequest,
 } from '@runwaymind/shared';
@@ -180,4 +183,63 @@ export function intervalLabel(interval: number): string {
   if (interval === MONTHLY_INTERVAL_SEC) return 'Monthly (30 d)';
   if (interval % SECONDS_PER_DAY === 0) return `Every ${interval / SECONDS_PER_DAY} days`;
   return `Every ${interval} s`;
+}
+
+// ---- PATCH /obligations/:id (docs/07 §5.2) -----------------------------------------------------------------------
+
+export interface ObligationEditValues {
+  recipient: string;
+  amount: string; // decimal USDC, e.g. "20,000.00"
+  nextDueDate: string; // YYYY-MM-DD
+  label: string;
+  notes: string;
+}
+
+export interface ObligationEditOriginal {
+  recipient: string;
+  amount: string; // base units
+  nextDueDate: number;
+  label: string | null;
+  notes: string | null;
+}
+
+export function toEditValues(o: ObligationEditOriginal): ObligationEditValues {
+  return {
+    recipient: o.recipient,
+    amount: formatUsdcPlain(BigInt(o.amount)),
+    nextDueDate: toIsoDateUtc(o.nextDueDate),
+    label: o.label ?? '',
+    notes: o.notes ?? '',
+  };
+}
+
+/**
+ * Only changed fields are sent: on-chain fields (recipient, amount, nextDueDate) produce a prepared
+ * `updateObligation` tx, label/notes-only changes are applied off-chain (docs/07 §5.2). Throws
+ * `ObligationFormError` on unparsable input; the result is validated with the shared schema by the API client.
+ */
+export function buildUpdateObligationRequest(
+  original: ObligationEditOriginal,
+  values: ObligationEditValues,
+): z.input<typeof UpdateObligationRequestSchema> {
+  const body: z.input<typeof UpdateObligationRequestSchema> = {};
+  if (values.recipient.trim().toLowerCase() !== original.recipient.toLowerCase()) body.recipient = values.recipient.trim();
+  let amount: bigint;
+  try {
+    amount = parseUsdc(values.amount);
+  } catch {
+    throw new ObligationFormError('amount', 'Enter an amount like 20000 or 20,000.50 (max 6 decimals)');
+  }
+  if (amount !== BigInt(original.amount)) body.amount = amount.toString();
+  let due: number;
+  try {
+    due = toUtcMidnight(values.nextDueDate);
+  } catch {
+    throw new ObligationFormError('firstDueDate', 'Pick a valid date');
+  }
+  if (due !== original.nextDueDate) body.nextDueDate = due;
+  if (values.label.trim() !== (original.label ?? '')) body.label = values.label.trim();
+  const notes = values.notes.trim() === '' ? null : values.notes.trim();
+  if (notes !== (original.notes ?? null)) body.notes = notes;
+  return body;
 }

@@ -32,5 +32,3 @@ pnpm build              # forge build + all workspace packages
 pnpm test               # forge test + all workspace tests
 pnpm dev                # backend + frontend in watch mode
 ```
-
-Configuration and Fuji deployment steps: [docs/11_DEPLOYMENT_AND_CONFIGURATION.md](docs/11_DEPLOYMENT_AND_CONFIGURATION.md).

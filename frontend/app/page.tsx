@@ -3,6 +3,7 @@
 import { EfficiencyGauge } from '@/components/dashboard/EfficiencyGauge';
 import { UpcomingObligationsList } from '@/components/dashboard/UpcomingObligationsList';
 import { WithdrawalTimeline } from '@/components/dashboard/WithdrawalTimeline';
+import { RecommendationList } from '@/components/recommendations/RecommendationList';
 import { AmountText, ErrorState, PageHeader, Skeleton, StatCard } from '@/components/ui';
 import { useActiveObligations, useOverview, useWithdrawalSchedule } from '@/hooks/useApiQueries';
 import { useTreasuryReads } from '@/hooks/useTreasuryReads';
@@ -86,8 +87,11 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Row 3 — upcoming obligations */}
-        <div className="md:col-span-2 lg:col-span-6">
+        {/* Row 3 — recommendations (7) + upcoming obligations (5) */}
+        <div className="md:col-span-2 lg:col-span-7">
+          <RecommendationList chainTime={chainTime} />
+        </div>
+        <div className="md:col-span-2 lg:col-span-5">
           {obligations.data ? (
             <UpcomingObligationsList obligations={obligations.data.data} chainTime={chainTime} demoStartTime={demoStartTime} />
           ) : obligations.isError ? (

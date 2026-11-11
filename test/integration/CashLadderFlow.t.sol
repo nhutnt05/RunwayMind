@@ -190,7 +190,9 @@ contract CashLadderFlowTest is Fixture, AltAssetSystem {
             assertEq(uint8(ob.status), uint8(ObligationStatus.ACTIVE), "unlimited payroll stays active");
             // not due again until next month
             vm.prank(keeper);
-            vm.expectRevert(abi.encodeWithSelector(ObligationNotDue.selector, id, ob.nextDueDate, treasury.currentTime()));
+            vm.expectRevert(
+                abi.encodeWithSelector(ObligationNotDue.selector, id, ob.nextDueDate, treasury.currentTime())
+            );
             treasury.pay(id);
         }
         assertEq(registry.getObligation(id).paidOccurrences, 3);
