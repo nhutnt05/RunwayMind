@@ -1,0 +1,26 @@
+{
+  "name": "@runwaymind/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent engines (pure), orchestrator, executor and keeper",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@runwaymind/shared": "workspace:*",
+    "viem": "^2.21.55",
+    "zod": "^3.24.1",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "fast-check": "^3.23.2"
+  }
+}

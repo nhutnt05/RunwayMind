@@ -1,0 +1,27 @@
+{
+  "name": "@runwaymind/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared types, zod schemas, formatting, ABIs and deployments",
+  "exports": {
+    ".": "./src/index.ts",
+    "./abi": "./src/abi/index.ts",
+    "./deployments": "./src/deployments/index.ts",
+    "./deployments/*": "./src/deployments/*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src test scripts",
+    "test": "vitest run",
+    "sync-abi": "tsx scripts/sync-abi.ts"
+  },
+  "dependencies": {
+    "viem": "^2.21.55",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

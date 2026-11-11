@@ -1,0 +1,16 @@
+packages:
+  - packages/*
+  - agent
+  - backend
+  - frontend
+
+# Dependency install scripts: esbuild (vitest, tsx, tsup) and Prisma (query/schema engines) need native binaries.
+# The others have pure-JS fallbacks.
+allowBuilds:
+  esbuild: true
+  bufferutil: false
+  keccak: false
+  utf-8-validate: false
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true

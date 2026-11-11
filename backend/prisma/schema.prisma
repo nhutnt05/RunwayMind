@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model TreasuryConfig {
+  id               String   @id            // "fuji-musdc"
+  chainId          Int
+  treasuryAddress  String   @unique
+  registryAddress  String
+  policyAddress    String
+  assetAddress     String
+  assetSymbol      String
+  assetDecimals    Int
+  deployBlock      String
+  demoStartTime    Int?
+  isPrimary        Boolean  @default(false)
+  pools            Pool[]
+  metadata         ObligationMetadata[]
+  drafts           ObligationDraft[]
+  decisions        AgentDecision[]
+  inflows          ExpectedInflow[]
+  settings         AgentSettings?
+}
+
+model Wallet {
+  address         String   @id
+  label           String?
+  cachedRoles     String   // JSON array of WalletRole
+  rolesCheckedAt  DateTime
+  lastSeenAt      DateTime
+}
+
+model AuthNonce {
+  nonce      String   @id
+  expiresAt  DateTime
+  usedAt     DateTime?
+}
+
+model ObligationMetadata {
+  treasuryId    String
+  obligationId  String               // on-chain id (bigint as string)
+  label         String
+  notes         String?
+  source        String               // FORM | NL | SEED
+  nlDraftId     String?  @unique
+  metadataHash  String
+  createTxHash  String
+  createdAt     DateTime @default(now())
+  treasury      TreasuryConfig @relation(fields: [treasuryId], references: [id])
+  @@id([treasuryId, obligationId])
+}
+
+model ObligationDraft {
+  id             String   @id @default(cuid())
+  treasuryId     String
+  status         String   // DRAFT | SUBMITTED | CONFIRMED | DISCARDED
+  source         String
+  label          String
+  category       String
+  recipient      String?
+  amount         String
+  firstDueDate   Int
+  interval       Int
+  maxOccurrences Int
+  warnings       String   // JSON
+  sourceText     String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  treasury       TreasuryConfig @relation(fields: [treasuryId], references: [id])
+  @@index([treasuryId, status])
+}
+
+model Pool {
+  adapterAddress String   @id
+  poolAddress    String
+  treasuryId     String
+  name           String
+  kind           String   // MOCK | AAVE_V3
+  addedAt        DateTime @default(now())
+  treasury       TreasuryConfig @relation(fields: [treasuryId], references: [id])
+  samples        PoolMetricSample[]
+  risks          PoolRiskSnapshot[]
+}
+
+model PoolMetricSample {
+  id                 Int      @id @default(autoincrement())
+  adapterAddress     String
+  sampledAt          Int      // chain time
+  blockNumber        String
+  apyBps             Int
+  utilizationBps     Int
+  tvl                String
+  availableLiquidity String
+  paused             Boolean
+  pool               Pool     @relation(fields: [adapterAddress], references: [adapterAddress])
+  @@index([adapterAddress, sampledAt])
+}
+
+model PoolRiskSnapshot {
+  id             Int      @id @default(autoincrement())
+  adapterAddress String
+  snapshotId     String
+  score          Int
+  band           String   // HEALTHY | WATCH | CRITICAL
+  components     String   // JSON
+  computedAt     Int
+  pool           Pool     @relation(fields: [adapterAddress], references: [adapterAddress])
+  @@index([adapterAddress, computedAt])
+}
+
+model ChainSnapshotRecord {
+  id           String   @id            // snapshotId
+  treasuryId   String
+  blockNumber  String
+  chainTime    Int
+  data         String   // JSON ChainSnapshot (bigint as string)
+  createdAt    DateTime @default(now())
+  ladder       LadderSnapshot?
+  @@index([treasuryId, chainTime])
+}
+
+model LadderSnapshot {
+  snapshotId   String   @id
+  result       String   // JSON CashLadderResult
+  snapshot     ChainSnapshotRecord @relation(fields: [snapshotId], references: [id])
+}
+
+model AgentDecision {
+  id            String   @id @default(cuid())
+  treasuryId    String
+  snapshotId    String
+  action        String   // INVEST | WITHDRAW | WITHDRAW_ALL | TRIP_CIRCUIT_BREAKER | HOLD
+  adapter       String?
+  amount        String?
+  reasonCode    String
+  status        String   // DecisionStatus (05 §2.1)
+  mode          String   // APPROVE | AUTO
+  facts         String   // JSON DecisionFacts
+  explanation   String?  // JSON Explanation
+  explanationSource String? // LLM | TEMPLATE
+  approvedBy    String?
+  approvedAt    DateTime?
+  rejectedBy    String?
+  rejectReason  String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  treasury      TreasuryConfig @relation(fields: [treasuryId], references: [id])
+  actions       AgentAction[]
+  @@index([treasuryId, status, createdAt])
+}
+
+model AgentAction {
+  id            String   @id @default(cuid())
+  decisionId    String
+  functionName  String   // invest | withdraw | tripCircuitBreaker
+  args          String   // JSON
+  status        String   // AgentActionStatus
+  txHash        String?  @unique
+  decodedError  String?  // JSON { name, args }
+  gasUsed       String?
+  blockNumber   String?
+  attempt       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  decision      AgentDecision @relation(fields: [decisionId], references: [id])
+  @@index([decisionId])
+}
+
+model Transaction {
+  hash          String   @id
+  treasuryId    String
+  kind          String   // TransactionKind
+  fromAddress   String
+  initiator     String   // AGENT | KEEPER | ADMIN_UI | INDEXER
+  status        String   // TransactionStatus
+  blockNumber   String?
+  decodedEvents String?  // JSON
+  error         String?  // JSON
+  relatedId     String?  // decisionId | draftId | keeperRunId
+  createdAt     DateTime @default(now())
+  confirmedAt   DateTime?
+  @@index([treasuryId, createdAt])
+  @@index([kind, status])
+}
+
+model IndexedEvent {
+  id           String  @id        // `${txHash}:${logIndex}`
+  treasuryId   String
+  name         String  // Invested | Withdrawn | ObligationPaid | DeadlineEnforced | ObligationCreated | ...
+  blockNumber  String
+  txHash       String
+  args         String  // JSON
+  chainTime    Int?
+  @@index([treasuryId, name, blockNumber])
+}
+
+model ChainEventCursor {
+  treasuryId   String  @id
+  lastBlock    String
+  updatedAt    DateTime @updatedAt
+}
+
+model KeeperRun {
+  id              String   @id @default(cuid())
+  treasuryId      String
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+  chainTime       Int
+  shortfallBefore String
+  enforced        Boolean
+  paidIds         String   // JSON
+  txHashes        String   // JSON
+  errors          String   // JSON
+  @@index([treasuryId, startedAt])
+}
+
+model StressTestRun {
+  id               String   @id @default(cuid())
+  treasuryId       String
+  snapshotId       String
+  scenarios        String   // JSON StressScenarioId[]
+  result           String   // JSON StressTestResult
+  worstCase        String
+  overallClass     String
+  requestedBy      String?
+  createdAt        DateTime @default(now())
+  @@index([treasuryId, createdAt])
+}
+
+model ExpectedInflow {
+  id            String   @id @default(cuid())
+  treasuryId    String
+  label         String
+  amount        String
+  expectedDate  Int
+  createdBy     String
+  createdAt     DateTime @default(now())
+  treasury      TreasuryConfig @relation(fields: [treasuryId], references: [id])
+  @@index([treasuryId, expectedDate])
+}
+
+model AgentSettings {
+  treasuryId           String  @id
+  mode                 String  @default("APPROVE")
+  minApyBps            Int     @default(300)
+  riskInvestThreshold  Int     @default(70)
+  riskWithdrawThreshold Int    @default(40)
+  minActionAmount      String  @default("100000000")
+  preWithdrawLeadDays  Int     @default(2)
+  decisionTtlSec       Int     @default(600)
+  loopIntervalSec      Int     @default(30)
+  updatedBy            String?
+  updatedAt            DateTime @updatedAt
+  treasury             TreasuryConfig @relation(fields: [treasuryId], references: [id])
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  treasuryId  String
+  eventType   String   // AuditEventType
+  actor       String   // address or "system"
+  entityType  String?  // DECISION | ACTION | OBLIGATION | SETTINGS | KEEPER | NL
+  entityId    String?
+  payload     String   // JSON
+  createdAt   DateTime @default(now())
+  @@index([treasuryId, createdAt])
+  @@index([entityType, entityId])
+}

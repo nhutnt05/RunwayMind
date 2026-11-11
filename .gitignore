@@ -1,0 +1,28 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# databases
+*.db
+*.db-journal
+
+# foundry
+out/
+cache/
+broadcast/
+
+# node
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# misc
+.DS_Store
+*.log
+
+# docs
+docs/

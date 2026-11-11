@@ -1,0 +1,27 @@
+{
+  "name": "runwaymind",
+  "private": true,
+  "description": "RunwayMind — AI CFO for DAOs on Avalanche Fuji",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "forge build && pnpm -r build",
+    "test": "forge test && pnpm -r test",
+    "lint": "forge fmt --check && pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "sync-abi": "pnpm --filter @runwaymind/shared run sync-abi",
+    "dev": "pnpm --parallel --filter @runwaymind/backend --filter @runwaymind/frontend dev",
+    "demo:reset": "tsx scripts/demo/reset.ts",
+    "demo:attack": "tsx scripts/demo/attack.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^20.17.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8",
+    "tsx": "^4.19.2"
+  }
+}
