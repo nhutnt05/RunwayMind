@@ -9,7 +9,7 @@
     "VaultAdapter": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
   },
   "demoMode": true,
-  "demoStartTime": 1794491961,
+  "demoStartTime": 1794492318,
   "deployBlock": "0",
   "roles": {
     "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
