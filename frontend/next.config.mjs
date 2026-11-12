@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // NEXT_DIST_DIR lets `next build` run while `next dev` uses .next (e.g. CI checks next to a dev server).
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   transpilePackages: ['@runwaymind/shared'],
   webpack: (config) => {
     // Optional peer deps pulled in by WalletConnect / MetaMask SDK that are not needed in the browser.

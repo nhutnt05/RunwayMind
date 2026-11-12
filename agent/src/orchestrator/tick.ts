@@ -13,6 +13,8 @@ import { templateExplanation, type ExplanationLanguage } from '../llm/templates'
 import { createExplainer } from '../llm/explain';
 import type { LlmProvider } from '../llm/provider';
 import type { AgentStore, DecisionRecord } from './store';
+import { executeAutoApproved, initialStatus } from './auto';
+import { computeSnapshotRisks } from './risk';
 
 export interface AgentLoopDeps {
   client: PublicClient;
@@ -97,8 +99,12 @@ export function createAgentLoop(deps: AgentLoopDeps) {
       );
     }
 
+    // Pool Risk (docs/06 §4): sample every adapter each tick, persist samples + risk snapshots, feed decide().
+    const { samples, risks } = await computeSnapshotRisks(store, snapshot, settings);
+    await store.savePoolMetrics(snapshot.snapshotId, snapshot.adapters, samples, risks);
+
     const labels = await store.obligationLabels();
-    const drafts = decide(snapshot, ladder, [], settings, { labels });
+    const drafts = decide(snapshot, ladder, risks, settings, { labels });
     const open = await store.listOpenDecisions();
     const created: DecisionRecord[] = [];
     const superseded: string[] = [];
@@ -164,8 +170,8 @@ export function createAgentLoop(deps: AgentLoopDeps) {
         adapter: d.adapter,
         amount: d.amount,
         reasonCode: d.reasonCode,
-        // HOLD is informational: never auto-approved (nothing to execute; avoids re-creating it every tick).
-        status: settings.mode === 'AUTO' && d.action !== 'HOLD' ? 'APPROVED' : 'PENDING_APPROVAL',
+        // Auto Mode rules (docs/05 §8): see orchestrator/auto.ts.
+        status: initialStatus(settings.mode, d),
         mode: settings.mode,
         facts: d.facts,
         explanation,
@@ -179,9 +185,7 @@ export function createAgentLoop(deps: AgentLoopDeps) {
       );
     }
 
-    if (deps.executor) {
-      for (const d of created) if (d.status === 'APPROVED') void deps.executor.enqueue(d.id);
-    }
+    await executeAutoApproved({ audit, executor: deps.executor ?? null }, created);
     await audit.record('AGENT_TICK', {
       snapshotId: snapshot.snapshotId,
       blockNumber: snapshot.blockNumber,

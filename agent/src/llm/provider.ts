@@ -50,6 +50,14 @@ export const LlmConfigSchema = z.object({
   LLM_MODEL: z.preprocess(stripComment, z.string()).default(''),
   LLM_API_KEY: z.preprocess(stripComment, z.string()).default(''),
   LLM_TIMEOUT_MS: z.preprocess(stripComment, z.coerce.number().int().positive()).default(8000),
+  /** Optional API-compatible endpoint (e.g. a relay). Unset → the provider's official API. HTTPS only. */
+  LLM_BASE_URL: z.preprocess(
+    (v) => {
+      const s = stripComment(v);
+      return s === '' ? undefined : s;
+    },
+    z.string().url().refine((u) => u.startsWith('https://'), 'LLM_BASE_URL must use https').optional(),
+  ),
 });
 
 export interface LlmConfig {
@@ -58,7 +66,16 @@ export interface LlmConfig {
   model: string;
   apiKey: string;
   timeoutMs: number;
+  /** Base URL without trailing slash; undefined → official API. */
+  baseUrl?: string;
 }
+
+export const DEFAULT_BASE_URL: Record<LlmProviderName, string> = {
+  anthropic: 'https://api.anthropic.com',
+  openai: 'https://api.openai.com',
+};
+
+const base = (cfg: { baseUrl?: string | undefined }, provider: LlmProviderName) => (cfg.baseUrl ?? DEFAULT_BASE_URL[provider]).replace(/\/+$/, '');
 
 /**
  * Reads LLM_* from env. The LLM counts as enabled only when LLM_ENABLED=true AND a model and key are set; otherwise
@@ -72,6 +89,7 @@ export function loadLlmConfig(env: Record<string, string | undefined> = process.
     model: p.LLM_MODEL,
     apiKey: p.LLM_API_KEY,
     timeoutMs: p.LLM_TIMEOUT_MS,
+    ...(p.LLM_BASE_URL ? { baseUrl: p.LLM_BASE_URL } : {}),
   };
 }
 
@@ -103,13 +121,13 @@ async function postJson(fetchImpl: FetchLike, url: string, headers: Record<strin
   return (await res.json()) as unknown;
 }
 
-export function createAnthropicProvider(cfg: Pick<LlmConfig, 'model' | 'apiKey'>, fetchImpl: FetchLike = fetch): LlmProvider {
+export function createAnthropicProvider(cfg: Pick<LlmConfig, 'model' | 'apiKey' | 'baseUrl'>, fetchImpl: FetchLike = fetch): LlmProvider {
   return {
     name: 'anthropic',
     async completeJson({ system, user, signal }) {
       const json = (await postJson(
         fetchImpl,
-        'https://api.anthropic.com/v1/messages',
+        `${base(cfg, 'anthropic')}/v1/messages`,
         { 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
         {
           model: cfg.model,
@@ -126,13 +144,13 @@ export function createAnthropicProvider(cfg: Pick<LlmConfig, 'model' | 'apiKey'>
   };
 }
 
-export function createOpenAiProvider(cfg: Pick<LlmConfig, 'model' | 'apiKey'>, fetchImpl: FetchLike = fetch): LlmProvider {
+export function createOpenAiProvider(cfg: Pick<LlmConfig, 'model' | 'apiKey' | 'baseUrl'>, fetchImpl: FetchLike = fetch): LlmProvider {
   return {
     name: 'openai',
     async completeJson({ system, user, signal }) {
       const json = (await postJson(
         fetchImpl,
-        'https://api.openai.com/v1/chat/completions',
+        `${base(cfg, 'openai')}/v1/chat/completions`,
         { authorization: `Bearer ${cfg.apiKey}` },
         {
           model: cfg.model,

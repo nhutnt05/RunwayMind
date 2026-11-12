@@ -5,7 +5,9 @@ import {
   computeCashLadder,
   computeRunway,
   expandOccurrences,
+  computeSnapshotRisks,
   riskScoreOf,
+  type AgentStore,
   withdrawalDeadline,
 } from '@runwaymind/agent';
 import type {
@@ -49,7 +51,11 @@ function obligationItem(ob: ObligationOnChain, s: Pick<ChainSnapshot, 'chainTime
 
 export type ObligationStatusFilter = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'ALL';
 
-export function createTreasuryService(chain: ChainService, repos: Repositories) {
+/**
+ * `store` (optional) supplies PoolMetricSample history so overview risk scores match GET /pools (docs/06 §4.1);
+ * without it the current state alone is scored.
+ */
+export function createTreasuryService(chain: ChainService, repos: Repositories, store?: Pick<AgentStore, 'poolHistory'>) {
   return {
     async overview() {
       const [s, cfg, inflows, pending, principal, metadata] = await Promise.all([
@@ -62,6 +68,7 @@ export function createTreasuryService(chain: ChainService, repos: Repositories) 
       ]);
       const ladder = computeCashLadder(s);
       const runway = computeRunway(baselineRunwayInput(s, inflows));
+      const risks = store ? (await computeSnapshotRisks(store, s, await repos.agentSettings())).risks : [];
       const next = ladder.occurrences.find((o) => o.dueDate > s.chainTime) ?? null;
       const data = {
         treasury: s.treasury,
@@ -91,7 +98,7 @@ export function createTreasuryService(chain: ChainService, repos: Repositories) 
           apyBps: a.apyBps,
           paused: a.paused,
           utilizationBps: a.utilizationBps,
-          riskScore: riskScoreOf(a, []),
+          riskScore: riskScoreOf(a, risks),
         })),
         nextObligation: next
           ? {

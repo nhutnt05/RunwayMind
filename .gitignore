@@ -6,6 +6,7 @@
 # databases
 *.db
 *.db-journal
+*.db.bak
 
 # foundry
 out/
@@ -16,6 +17,7 @@ broadcast/
 node_modules/
 dist/
 .next/
+.next-build/
 coverage/
 *.tsbuildinfo
 next-env.d.ts

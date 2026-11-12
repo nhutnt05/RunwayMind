@@ -1,6 +1,8 @@
 'use client';
 
+import { AccruedYieldTicker } from '@/components/dashboard/AccruedYieldTicker';
 import { EfficiencyGauge } from '@/components/dashboard/EfficiencyGauge';
+import { RunwayMeter } from '@/components/dashboard/RunwayMeter';
 import { UpcomingObligationsList } from '@/components/dashboard/UpcomingObligationsList';
 import { WithdrawalTimeline } from '@/components/dashboard/WithdrawalTimeline';
 import { RecommendationList } from '@/components/recommendations/RecommendationList';
@@ -78,13 +80,19 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Row 2 — efficiency (runway meter and yield ticker arrive in D5) */}
-        <div className="md:col-span-2 lg:col-span-6">
+        {/* Row 2 — RunwayMeter (4) + EfficiencyGauge (4) + AccruedYieldTicker (4) (docs/08 §2) */}
+        <div className="lg:col-span-4">
+          <RunwayMeter />
+        </div>
+        <div className="lg:col-span-4">
           {o ? (
             <EfficiencyGauge actualBps={o.actualEfficiencyBps} targetBps={o.capitalEfficiencyBps} />
           ) : (
             <Skeleton className="h-32 w-full" />
           )}
+        </div>
+        <div className="md:col-span-2 lg:col-span-4">
+          <AccruedYieldTicker />
         </div>
 
         {/* Row 3 — recommendations (7) + upcoming obligations (5) */}

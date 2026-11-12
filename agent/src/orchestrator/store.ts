@@ -10,7 +10,10 @@ import type {
   Amount,
   CashLadderResult,
   ChainSnapshot,
+  AdapterState,
   DecisionFacts,
+  PoolMetricSample,
+  PoolRiskResult,
   DecisionStatus,
   Explanation,
   ReasonCode,
@@ -114,6 +117,10 @@ export interface AgentStore {
   /** Off-chain obligation labels keyed by on-chain id (decision facts, docs/05 §5.3). */
   obligationLabels(): Promise<Record<string, string>>;
   saveSnapshot(s: ChainSnapshot, l: CashLadderResult): Promise<void>;
+  /** Newest-first PoolMetricSample history of one adapter (docs/06 §4.1), at most `limit` rows. */
+  poolHistory(adapter: Address, limit: number): Promise<PoolMetricSample[]>;
+  /** One PoolMetricSample + PoolRiskSnapshot per adapter for this tick (docs/09 §3). */
+  savePoolMetrics(snapshotId: string, adapters: readonly AdapterState[], samples: readonly PoolMetricSample[], risks: readonly PoolRiskResult[]): Promise<void>;
 
   listOpenDecisions(): Promise<DecisionRecord[]>;
   getDecision(id: string): Promise<DecisionRecord | null>;
@@ -138,6 +145,8 @@ export class MemoryAgentStore implements AgentStore {
   settings: AgentSettings = { ...DEFAULT_AGENT_SETTINGS };
   labels: Record<string, string> = {};
   snapshots: { snapshot: ChainSnapshot; ladder: CashLadderResult }[] = [];
+  poolSamples: PoolMetricSample[] = [];
+  poolRisks: (PoolRiskResult & { snapshotId: string })[] = [];
   decisions = new Map<string, DecisionRecord>();
   actions = new Map<string, ActionRecord>();
   transactions = new Map<string, TransactionInput>();
@@ -154,6 +163,16 @@ export class MemoryAgentStore implements AgentStore {
   }
   async saveSnapshot(snapshot: ChainSnapshot, ladder: CashLadderResult) {
     this.snapshots.push({ snapshot, ladder });
+  }
+  async poolHistory(adapter: Address, limit: number) {
+    return this.poolSamples
+      .filter((x) => x.adapterAddress.toLowerCase() === adapter.toLowerCase())
+      .sort((a, b) => b.sampledAt - a.sampledAt)
+      .slice(0, limit);
+  }
+  async savePoolMetrics(snapshotId: string, _adapters: readonly AdapterState[], samples: readonly PoolMetricSample[], risks: readonly PoolRiskResult[]) {
+    this.poolSamples.push(...samples);
+    this.poolRisks.push(...risks.map((r) => ({ ...r, snapshotId })));
   }
   async listOpenDecisions() {
     return [...this.decisions.values()].filter((d) => OPEN_DECISION_STATUSES.includes(d.status));

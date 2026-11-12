@@ -14,6 +14,7 @@ import {
   type ReasonCode,
 } from '@runwaymind/shared';
 import { SECONDS_PER_DAY, allocateSources } from './cashLadder';
+import { computePoolRisk } from './poolRisk';
 
 const minA = (a: Amount, b: Amount): Amount => (a < b ? a : b);
 const max0 = (x: Amount): Amount => (x > 0n ? x : 0n);
@@ -25,10 +26,13 @@ export interface DecideContext {
   previousApyBps?: Readonly<Record<string, number>>;
 }
 
-/** Pool Risk Score for an adapter; falls back to `paused ? 0 : 100` when the risk module has no result (§5.2). */
+/**
+ * Pool Risk Score for an adapter (docs/06 §4). Uses the tick's computed result (with APY history); without one it
+ * scores the current state alone (no history → V = 100, §4.5) instead of the old `paused ? 0 : 100` fallback.
+ */
 export function riskScoreOf(a: AdapterState, risks: readonly PoolRiskResult[]): number {
   const r = risks.find((x) => x.adapter.toLowerCase() === a.address.toLowerCase());
-  return r ? r.score : a.paused ? 0 : 100;
+  return r ? r.score : computePoolRisk(a, [], { computedAt: 0 }).score;
 }
 
 export function decide(
@@ -140,6 +144,21 @@ export function decide(
 
 function riskMap(adapters: readonly AdapterState[], score: (a: AdapterState) => number): Record<string, number> {
   return Object.fromEntries(adapters.map((a) => [a.address, score(a)]));
+}
+
+/**
+ * Facts for an ADMIN-initiated decision (`reasonCode: MANUAL`, docs/07 §5.5): same grounded numbers as rule
+ * decisions, computed from the snapshot and ladder. Pure.
+ */
+export function manualFacts(
+  s: ChainSnapshot,
+  l: CashLadderResult,
+  cfg: AgentSettings,
+  adapter: string | null,
+  amount: Amount | null,
+): DecisionFacts {
+  const a = adapter ? (s.adapters.find((x) => x.address.toLowerCase() === adapter.toLowerCase()) ?? null) : null;
+  return buildFacts(s, l, cfg, a, amount, null, (x) => riskScoreOf(x, []), {});
 }
 
 function buildFacts(

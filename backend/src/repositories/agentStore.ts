@@ -23,12 +23,37 @@ import {
   type AgentMode,
   type Address,
   type CashLadderResult,
+  type AdapterState,
   type ChainSnapshot,
   type DecisionStatus,
+  type PoolMetricSample,
+  type PoolRiskResult,
   type Explanation,
   type ReasonCode,
 } from '@runwaymind/shared';
 import type { Repositories } from './index';
+
+export function toPoolSample(row: {
+  adapterAddress: string;
+  sampledAt: number;
+  blockNumber: string;
+  apyBps: number;
+  utilizationBps: number;
+  tvl: string;
+  availableLiquidity: string;
+  paused: boolean;
+}): PoolMetricSample {
+  return {
+    adapterAddress: row.adapterAddress as Address,
+    sampledAt: row.sampledAt,
+    blockNumber: BigInt(row.blockNumber),
+    apyBps: row.apyBps,
+    utilizationBps: row.utilizationBps,
+    tvl: BigInt(row.tvl),
+    availableLiquidity: BigInt(row.availableLiquidity),
+    paused: row.paused,
+  };
+}
 
 export const newId = (prefix: string) => `${prefix}_${randomUUID().replace(/-/g, '')}`;
 
@@ -128,6 +153,55 @@ export class PrismaAgentStore implements AgentStore, AuditSink {
       await this.prisma.ladderSnapshot.deleteMany({ where: { snapshotId: { in: ids } } });
       await this.prisma.chainSnapshotRecord.deleteMany({ where: { id: { in: ids } } });
     }
+  }
+
+  /** docs/09 §3 PoolMetricSample, newest first. */
+  async poolHistory(adapter: Address, limit: number): Promise<PoolMetricSample[]> {
+    const rows = await this.prisma.poolMetricSample.findMany({
+      where: { adapterAddress: adapter },
+      orderBy: [{ sampledAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+    });
+    return rows.map(toPoolSample);
+  }
+
+  /** Upserts the Pool row, then stores one PoolMetricSample + PoolRiskSnapshot per adapter (docs/06 §4.1). */
+  async savePoolMetrics(snapshotId: string, adapters: readonly AdapterState[], samples: readonly PoolMetricSample[], risks: readonly PoolRiskResult[]) {
+    await this.prisma.$transaction(async (tx) => {
+      for (const a of adapters) {
+        await tx.pool.upsert({
+          where: { adapterAddress: a.address },
+          create: { adapterAddress: a.address, poolAddress: '', treasuryId: this.treasuryId, name: a.name, kind: /aave/i.test(a.name) ? 'AAVE_V3' : 'MOCK' },
+          update: { name: a.name },
+        });
+      }
+      for (const x of samples) {
+        await tx.poolMetricSample.create({
+          data: {
+            adapterAddress: x.adapterAddress,
+            sampledAt: x.sampledAt,
+            blockNumber: x.blockNumber.toString(),
+            apyBps: x.apyBps,
+            utilizationBps: x.utilizationBps,
+            tvl: x.tvl.toString(),
+            availableLiquidity: x.availableLiquidity.toString(),
+            paused: x.paused,
+          },
+        });
+      }
+      for (const r of risks) {
+        await tx.poolRiskSnapshot.create({
+          data: {
+            adapterAddress: r.adapter,
+            snapshotId,
+            score: r.score,
+            band: r.band,
+            components: JSON.stringify({ ...r.components, weights: r.weights, samplesUsed: r.samplesUsed }),
+            computedAt: r.computedAt,
+          },
+        });
+      }
+    });
   }
 
   async listOpenDecisions() {

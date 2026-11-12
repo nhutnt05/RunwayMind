@@ -5,3 +5,4 @@ export { policyEngineAbi } from './PolicyEngine';
 export { vaultAdapterAbi } from './VaultAdapter';
 export { mockLendingPoolAbi } from './MockLendingPool';
 export { mockUSDCAbi } from './MockUSDC';
+export { aaveV3AdapterAbi } from './AaveV3Adapter';

@@ -59,3 +59,13 @@ describe('formatDecodedError (docs/08 §8)', () => {
     expect(formatDecodedError(null)).toBe('Transaction would revert');
   });
 });
+
+describe('write-flow error reporting (CP2 B-9)', () => {
+  it('names the failing stage and redacts RPC URLs (API keys) from the message', async () => {
+    const { describeStageError, redactUrls } = await import('../lib/preparedTx');
+    expect(redactUrls('POST https://avax-fuji.g.example.com/v2/SECRET123 failed')).toBe('POST https://avax-fuji.g.example.com/… failed');
+    const msg = describeStageError('wallet', new Error('Request exceeds defined limit. URL: https://rpc.example.org/key/ABC'));
+    expect(msg).toBe('Wallet / wallet RPC: Request exceeds defined limit. URL: https://rpc.example.org/…');
+    expect(describeStageError('simulate', new Error('x'))).toBe('Simulation (app RPC): x');
+  });
+});

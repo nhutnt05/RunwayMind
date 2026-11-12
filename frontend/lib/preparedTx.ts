@@ -65,7 +65,28 @@ export function describeWriteError(e: unknown): string {
       const args = Object.fromEntries(values.map((v, i) => [inputs[i]?.name || String(i), v]));
       return formatDecodedError({ name: revert.data.errorName, args });
     }
-    return e.shortMessage || e.message;
+    // shortMessage alone hides which RPC call failed; `details` carries the provider's own message.
+    const details = e.details && e.details !== e.shortMessage ? ` (${e.details})` : '';
+    return redactUrls(`${e.shortMessage || e.message}${details}`);
   }
-  return e instanceof Error ? e.message : String(e);
+  return redactUrls(e instanceof Error ? e.message : String(e));
+}
+
+/** RPC URLs can embed API keys (e.g. `…/v2/<key>`): keep only scheme://host in user-visible errors. */
+export function redactUrls(text: string): string {
+  return text.replace(/\b(https?|wss?):\/\/([^\s/"'?#]+)[^\s"')]*/g, (_m, scheme: string, host: string) => `${scheme}://${host}/…`);
+}
+
+export type WriteStage = 'prepare' | 'simulate' | 'wallet' | 'receipt';
+
+const STAGE_LABEL: Record<WriteStage, string> = {
+  prepare: 'Backend prepare',
+  simulate: 'Simulation (app RPC)',
+  wallet: 'Wallet / wallet RPC',
+  receipt: 'Waiting for receipt',
+};
+
+/** "Wallet / wallet RPC: <message>" — tells the operator which step of the write flow failed. */
+export function describeStageError(stage: WriteStage, e: unknown): string {
+  return `${STAGE_LABEL[stage]}: ${describeWriteError(e)}`;
 }

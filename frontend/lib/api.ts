@@ -76,12 +76,16 @@ export function createApiClient(baseUrl: string = publicEnv.apiBaseUrl, fetchImp
   return {
     get: <T>(path: string) => request<T>('GET', path),
     post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
+    delete: <T>(path: string) => request<T>('DELETE', path),
     /** POST with a body validated by a shared zod schema (throws ZodError before any network call). */
     postValidated: <S extends z.ZodTypeAny, T>(path: string, schema: S, body: z.input<S>) =>
       request<T>('POST', path, schema.parse(body)),
     /** PATCH with a body validated by a shared zod schema. */
     patchValidated: <S extends z.ZodTypeAny, T>(path: string, schema: S, body: z.input<S>) =>
       request<T>('PATCH', path, schema.parse(body)),
+    /** PUT with a body validated by a shared zod schema. */
+    putValidated: <S extends z.ZodTypeAny, T>(path: string, schema: S, body: z.input<S>) =>
+      request<T>('PUT', path, schema.parse(body)),
   };
 }
 
@@ -216,3 +220,59 @@ export interface TransactionJson {
   snowtraceUrl: string;
   createdAt: number;
 }
+
+// ---- D4: agent settings / activity / keeper, vault + policy/demo prepared txs (docs/07 §4.7, §5.5–§5.7) ----------
+
+export interface AgentSettingsJson {
+  mode: AgentMode;
+  minApyBps: number;
+  riskWithdrawThreshold: number;
+  riskInvestThreshold: number;
+  preWithdrawLeadDays: number;
+  minActionAmount: string;
+  loopIntervalSec: number;
+  decisionTtlSec: number;
+}
+
+export interface KeeperRunJson {
+  id: string;
+  startedAt: number;
+  finishedAt: number | null;
+  chainTime: number;
+  shortfallBefore: string;
+  enforced: boolean;
+  paidIds: string[];
+  txHashes: string[];
+  errors: unknown[];
+}
+
+export interface KeeperStatusJson {
+  enabled: boolean;
+  keeperAddress: Address | null;
+  avaxBalance: string | null;
+  lastRunAt: number | null;
+  nextRunAt: number | null;
+  lastResult: KeeperRunJson | null;
+  lastError: string | null;
+}
+
+/** POST /vault/withdrawals | /vault/investments. */
+export interface VaultActionResponse {
+  executeVia: 'AGENT' | 'ADMIN_WALLET';
+  decision: AgentDecisionJson | null;
+  preparedTx: PreparedTx | null;
+  simulation: { ok: boolean; error: DecodedContractError | null };
+}
+
+/** POST /policy/prepare | /demo/prepare. */
+export interface AdminPrepareResponse {
+  preparedTx: PreparedTx & { contract: 'Treasury' | 'PolicyEngine' | 'MockLendingPool' };
+  simulation: { ok: boolean; error: DecodedContractError | null };
+}
+
+/** GET /transactions item (backend adds initiator / relatedId / confirmedAt). */
+export type TransactionItemJson = TransactionJson & {
+  initiator?: 'AGENT' | 'KEEPER' | 'ADMIN_UI' | 'INDEXER';
+  relatedId?: string | null;
+  confirmedAt?: number | null;
+};

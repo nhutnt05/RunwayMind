@@ -6,7 +6,7 @@ import { getAccount, simulateContract, waitForTransactionReceipt, writeContract 
 import { api, type ApiResult, type PrepareTxResponse } from '@/lib/api';
 import { appChain } from '@/lib/chains';
 import { contracts } from '@/lib/contracts';
-import { describeWriteError, formatDecodedError, verifyRegistryTx, type RegistryWriteFunction } from '@/lib/preparedTx';
+import { describeStageError, formatDecodedError, verifyRegistryTx, type RegistryWriteFunction, type WriteStage } from '@/lib/preparedTx';
 import { newToastId, txTracker } from '@/lib/txTracker';
 import { wagmiConfig } from '@/lib/wagmi';
 
@@ -42,6 +42,7 @@ export function useRegistryWrite() {
       const toast = (patch: Parameters<typeof txTracker.upsert>[0]) => txTracker.upsert(patch);
       toast({ id, title, status: 'PENDING', message: 'Preparing transaction…' });
       let sent: `0x${string}` | null = null;
+      let stage: WriteStage = 'prepare';
       try {
         const registry = contracts?.registry;
         if (!registry) throw new Error('ObligationRegistry address is not configured for this chain');
@@ -59,6 +60,7 @@ export function useRegistryWrite() {
 
         const call = verifyRegistryTx(prepared.preparedTx, { registry: registry.address, chainId: appChain.id, functionName });
 
+        stage = 'simulate';
         toast({ id, message: 'Simulating…' });
         const { request } = await simulateContract(wagmiConfig, {
           address: call.address,
@@ -69,6 +71,7 @@ export function useRegistryWrite() {
           chainId: appChain.id,
         } as never);
 
+        stage = 'wallet';
         toast({ id, message: 'Confirm in your wallet…' });
         const hash = await writeContract(wagmiConfig, request as never);
         sent = hash;
@@ -86,6 +89,7 @@ export function useRegistryWrite() {
           /* tracked later by the indexer */
         }
 
+        stage = 'receipt';
         const receipt = await waitForTransactionReceipt(wagmiConfig, { hash, chainId: appChain.id });
         const status = receipt.status === 'success' ? 'CONFIRMED' : 'REVERTED';
         toast({ id, status, message: status === 'CONFIRMED' ? 'Confirmed' : 'Transaction reverted' });
@@ -93,7 +97,7 @@ export function useRegistryWrite() {
         if (status === 'REVERTED') throw new Error('Transaction reverted');
         return { hash, status };
       } catch (e) {
-        const message = describeWriteError(e);
+        const message = describeStageError(stage, e);
         // Before a hash exists nothing reached the chain (prepare/simulation/wallet rejection) → FAILED.
         toast({ id, status: sent ? 'REVERTED' : 'FAILED', message });
         throw new Error(message);

@@ -303,3 +303,34 @@ describe('tick wiring (docs/05 §2, §7)', () => {
     expect(sink.entries.map((e) => e.eventType)).toEqual(['LLM_FALLBACK', 'DECISION_CREATED', 'AGENT_TICK']);
   });
 });
+
+describe('log redaction (rule 7)', () => {
+  it('redactUrls keeps only scheme://host for RPC URLs with keys in path or query', async () => {
+    const { redactUrls } = await import('../src/audit/audit');
+    const msg = 'Status: 400\nURL: https://avax-fuji.g.example.com/v2/SECRETKEY123\nRequest body: {"x":1} and wss://rpc.example.org/ws?apikey=abc';
+    const out = redactUrls(msg);
+    expect(out).not.toContain('SECRETKEY123');
+    expect(out).not.toContain('apikey=abc');
+    expect(out).toContain('https://avax-fuji.g.example.com/…');
+    expect(out).toContain('wss://rpc.example.org/…');
+  });
+});
+
+describe('LLM_BASE_URL (optional relay endpoint)', () => {
+  it('defaults to the official API; uses an https base URL when set; rejects http', async () => {
+    const { loadLlmConfig, createLlmProvider } = await import('../src/llm/provider');
+    const env = { LLM_ENABLED: 'true', LLM_PROVIDER: 'anthropic', LLM_MODEL: 'm', LLM_API_KEY: 'k' };
+    const urls: string[] = [];
+    const fakeFetch = (async (url: string) => {
+      urls.push(url);
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: '{"ok":true}' }] }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    expect(loadLlmConfig(env).baseUrl).toBeUndefined();
+    await createLlmProvider(loadLlmConfig(env), fakeFetch)!.completeJson({ system: 's', user: 'u' });
+    const relay = loadLlmConfig({ ...env, LLM_BASE_URL: 'https://relay.example.com/  # comment' });
+    await createLlmProvider(relay, fakeFetch)!.completeJson({ system: 's', user: 'u' });
+    expect(urls).toEqual(['https://api.anthropic.com/v1/messages', 'https://relay.example.com/v1/messages']);
+    expect(() => loadLlmConfig({ ...env, LLM_BASE_URL: 'http://relay.example.com' })).toThrow(/https/);
+  });
+});

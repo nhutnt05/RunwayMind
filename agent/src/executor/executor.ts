@@ -9,6 +9,7 @@ import { computeCashLadder } from '../engines/cashLadder';
 import { decide } from '../engines/decide';
 import { AuditLogger, silentLogger, type Logger } from '../audit/audit';
 import type { ActionRecord, AgentFunctionName, AgentStore, DecisionRecord } from '../orchestrator/store';
+import { computeSnapshotRisks } from '../orchestrator/risk';
 import { NonceQueue } from './nonceQueue';
 import {
   DEFAULT_RECEIPT_TIMEOUT_MS,
@@ -212,7 +213,8 @@ export class Executor {
 
     if (d.reasonCode !== 'MANUAL') {
       const settings = await this.deps.store.getSettings();
-      const fresh = decide(s, computeCashLadder(s), [], settings).find((x) => x.action === d.action && sameAddr(x.adapter, d.adapter));
+      const { risks } = await computeSnapshotRisks(this.deps.store, s, settings);
+      const fresh = decide(s, computeCashLadder(s), risks, settings).find((x) => x.action === d.action && sameAddr(x.adapter, d.adapter));
       if (!fresh) return { superseded: true, reason: 'INTENT_GONE' };
       if (d.amount !== null && fresh.amount !== null && !withinOnePercent(fresh.amount, d.amount)) {
         return { superseded: true, reason: 'AMOUNT_CHANGED' };

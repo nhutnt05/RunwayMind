@@ -58,7 +58,7 @@ describe('read endpoints (docs/07 §3–§4.3)', () => {
       nextObligation: { id: '1', label: 'November payroll', amount: '20000000000', dueDate: T0 + 7 * DAY },
       pendingRecommendations: 0,
     });
-    expect(body.data.adapters[0]).toMatchObject({ address: ADAPTER, status: 'ACTIVE', riskScore: 100 });
+    expect(body.data.adapters[0]).toMatchObject({ address: ADAPTER, status: 'ACTIVE', riskScore: 87 }); // docs/06 §4.3 D0 (util 50%, cash 10,000)
     assertNoAmountNumbers(body.data);
   });
 

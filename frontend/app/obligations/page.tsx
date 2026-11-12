@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { CreateObligationForm } from '@/components/obligations/CreateObligationForm';
+import { NaturalLanguageInput } from '@/components/obligations/NaturalLanguageInput';
 import { ObligationTable } from '@/components/obligations/ObligationTable';
 import { ErrorState, PageHeader, Skeleton } from '@/components/ui';
 import { useAdminGate } from '@/hooks/useAdminGate';
@@ -67,7 +68,8 @@ export default function ObligationsPage() {
             <Skeleton className="h-64 w-full" />
           )}
         </div>
-        <div className="xl:col-span-4">
+        <div className="space-y-6 xl:col-span-4">
+          <NaturalLanguageInput gate={gate} />
           <CreateObligationForm chainTime={chainTime} gate={gate} />
         </div>
       </div>

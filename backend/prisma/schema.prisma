@@ -61,6 +61,7 @@ model ObligationDraft {
   status         String   // DRAFT | SUBMITTED | CONFIRMED | DISCARDED
   source         String
   label          String
+  notes          String?  // carried to ObligationMetadata when the create tx is linked (docs/07 §5.1)
   category       String
   recipient      String?
   amount         String

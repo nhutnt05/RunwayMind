@@ -1,10 +1,11 @@
 // Test harness: real Fastify app + real SQLite (migrated) + fake ChainService with the SRC snapshot (docs/04 §5).
 import { PrismaClient } from '@prisma/client';
-import { getAddress, recoverMessageAddress, type Address, type Hex } from 'viem';
+import { getAddress, recoverMessageAddress, type Address, type Hex, type LocalAccount } from 'viem';
+import { createSiweMessage } from 'viem/siwe';
 import type { ChainSnapshot, ObligationOnChain } from '@runwaymind/shared';
-import { buildApp } from '../src/app';
+import { buildApp, type AppDeps } from '../src/app';
 import { ApiError } from '../src/errors';
-import type { ChainService, OnchainRole } from '../src/services/chain';
+import type { ChainService, OnchainRole, ReceiptView, SimulationCall, SimulationResult } from '../src/services/chain';
 
 export const DAY = 86_400;
 export const T0 = 1_793_318_400;
@@ -69,6 +70,11 @@ export class FakeChain implements ChainService {
   agents = new Set<string>();
   down = false;
   roleCalls = 0;
+  /** Next simulation outcome; every call is recorded. */
+  simulation: SimulationResult = { ok: true, error: null };
+  simulations: { account: Address; call: SimulationCall }[] = [];
+  /** Receipts by tx hash (lower-case); a missing hash behaves like a receipt timeout. */
+  receipts = new Map<string, ReceiptView>();
 
   private check() {
     if (this.down) throw new ApiError('CHAIN_UNAVAILABLE', 'RPC down');
@@ -95,6 +101,14 @@ export class FakeChain implements ChainService {
     this.check();
     return this.snapshot.blockNumber;
   }
+  async simulate(account: Address, call: SimulationCall) {
+    this.check();
+    this.simulations.push({ account, call });
+    return this.simulation;
+  }
+  async waitForReceipt(hash: Hex) {
+    return this.receipts.get(hash.toLowerCase()) ?? null;
+  }
 }
 
 export const prisma = new PrismaClient({ datasourceUrl: process.env.TEST_DATABASE_URL });
@@ -104,9 +118,17 @@ export async function resetDb() {
   await prisma.agentAction.deleteMany();
   await prisma.agentDecision.deleteMany();
   await prisma.obligationMetadata.deleteMany();
+  await prisma.obligationDraft.deleteMany();
+  await prisma.transaction.deleteMany();
+  await prisma.keeperRun.deleteMany();
+  await prisma.ladderSnapshot.deleteMany();
+  await prisma.chainSnapshotRecord.deleteMany();
   await prisma.indexedEvent.deleteMany();
   await prisma.chainEventCursor.deleteMany();
   await prisma.agentSettings.deleteMany();
+  await prisma.poolRiskSnapshot.deleteMany();
+  await prisma.poolMetricSample.deleteMany();
+  await prisma.stressTestRun.deleteMany();
   await prisma.pool.deleteMany();
   await prisma.authNonce.deleteMany();
   await prisma.wallet.deleteMany();
@@ -132,8 +154,8 @@ export async function resetDb() {
   });
 }
 
-export async function makeApp(chain = new FakeChain(), now?: () => Date) {
-  const { app, auth } = await buildApp({
+export async function makeApp(chain = new FakeChain(), now?: () => Date, extra: Partial<AppDeps> = {}) {
+  const built = await buildApp({
     prisma,
     chain,
     treasuryId: TREASURY_ID,
@@ -142,6 +164,30 @@ export async function makeApp(chain = new FakeChain(), now?: () => Date) {
     sessionSecret: 'test-secret-test-secret-test-secret-0123',
     production: false,
     ...(now ? { now } : {}),
+    ...extra,
   });
-  return { app, auth, chain };
+  return { ...built, chain };
+}
+
+type App = Awaited<ReturnType<typeof makeApp>>['app'];
+
+/** SIWE login (docs/07 §3.1); returns the `rm_session=…` cookie. */
+export async function loginCookie(app: App, account: LocalAccount): Promise<string> {
+  const nonce = (await app.inject({ method: 'POST', url: '/api/v1/auth/nonce' })).json().data.nonce as string;
+  const message = createSiweMessage({
+    address: account.address,
+    chainId: 43113,
+    domain: 'localhost:3000',
+    nonce,
+    uri: 'http://localhost:3000',
+    version: '1',
+  });
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/verify',
+    payload: { message, signature: await account.signMessage({ message }) },
+  });
+  if (res.statusCode !== 200) throw new Error(`login failed: ${res.body}`);
+  const raw = res.headers['set-cookie'];
+  return String(Array.isArray(raw) ? raw[0] : raw).split(';')[0]!;
 }

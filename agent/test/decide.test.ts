@@ -130,9 +130,11 @@ describe('decide (docs/05 §5.2, docs/10 §4.6)', () => {
     ]);
   });
 
-  it('risk fallback without a risk result: paused ? 0 : 100', () => {
-    expect(riskScoreOf(adapter(0n), [])).toBe(100);
+  it('risk without a tick result: Pool Risk Score of the current state, no history (D5-B1, docs/06 §4.5)', () => {
+    expect(riskScoreOf(adapter(0n), [])).toBe(87); // util 50%, V 100 (no samples), cash 10,000 → T 33.3
     expect(riskScoreOf(adapter(0n, { paused: true }), [])).toBe(0);
+    expect(riskScoreOf(adapter(0n, { utilizationBps: 9800 }), [])).toBe(43); // 0.5×12 + 0.3×100 + 0.2×33.3
+    expect(riskScoreOf(adapter(0n), [risk(22)])).toBe(22); // tick result wins
   });
 
   it('is deterministic', () => {

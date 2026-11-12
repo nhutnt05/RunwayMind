@@ -296,3 +296,35 @@ describe('property: schedule never leaves an occurrence unpaid when vault is liq
     );
   });
 });
+
+describe('Withdrawal timeline with NL exact offsets (D5-ALL B-5, docs/12 scene 0:45)', () => {
+  // CP2 Fuji: T0 = demoStartTime = 07:40 UTC; obligations parsed ~0.30 days later ("sau 7 / 30 / 45 ngày").
+  const T0_DEMO = 1_794_382_804;
+  const PARSED_AT = T0_DEMO + 26_028;
+  const dayN = (t: number) => Math.floor((t - T0_DEMO) / DAY);
+  const ladderFor = (dues: [number, number, number]) =>
+    computeCashLadder(
+      investedSnapshot({
+        chainTime: PARSED_AT,
+        onchainRequiredReserve: USDC(30_000),
+        obligations: [obligation(1, USDC(20_000), dues[0]), obligation(2, USDC(20_000), dues[1]), obligation(3, USDC(10_000), dues[2])],
+      }),
+    );
+
+  it('exact chain-time offsets → obligations on Day 7 / 30 / 45 and withdrawals on Day 16 (20,000) / Day 31 (10,000)', () => {
+    const dues: [number, number, number] = [PARSED_AT + 7 * DAY, PARSED_AT + 30 * DAY, PARSED_AT + 45 * DAY];
+    expect(dues.map(dayN)).toEqual([7, 30, 45]);
+    const r = ladderFor(dues);
+    expect(r.requiredReserve).toBe(USDC(30_000));
+    expect(r.withdrawalSchedule.map((w) => [dayN(w.deadline), w.amount])).toEqual([
+      [16, USDC(20_000)],
+      [31, USDC(10_000)],
+    ]);
+  });
+
+  it('00:00 UTC rounding of the same phrases would shift the timeline to Day 15 / Day 30 (the bug B-5 fixed)', () => {
+    const midnight = (t: number) => t - (t % DAY);
+    const dues: [number, number, number] = [midnight(PARSED_AT + 7 * DAY), midnight(PARSED_AT + 30 * DAY), midnight(PARSED_AT + 45 * DAY)];
+    expect(ladderFor(dues).withdrawalSchedule.map((w) => dayN(w.deadline))).toEqual([15, 30]);
+  });
+});

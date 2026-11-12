@@ -220,6 +220,7 @@ export function createRepositories(prisma: PrismaClient, treasuryId: string) {
       status: string;
       source: string;
       label: string;
+      notes?: string | null;
       category: string;
       recipient: string | null;
       amount: string;

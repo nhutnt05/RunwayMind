@@ -24,9 +24,19 @@ export interface Logger {
   error(msg: string, fields?: Record<string, unknown>): void;
 }
 
+/**
+ * Rule 7: RPC providers put API keys in the URL path or query (e.g. `…/v2/<key>`), and viem error messages embed the
+ * request URL. Every logged string keeps only `scheme://host/…`.
+ */
+export function redactUrls(text: string): string {
+  return text.replace(/\b(https?|wss?):\/\/([^\s/"'?#]+)[^\s"']*/g, (_m, scheme: string, host: string) => `${scheme}://${host}/…`);
+}
+
 const line = (level: string, module: string, msg: string, fields?: Record<string, unknown>) =>
-  JSON.stringify({ ts: new Date().toISOString(), level, module, msg, ...fields }, (_k, v) =>
-    typeof v === 'bigint' ? v.toString() : v,
+  redactUrls(
+    JSON.stringify({ ts: new Date().toISOString(), level, module, msg, ...fields }, (_k, v) =>
+      typeof v === 'bigint' ? v.toString() : v,
+    ),
   );
 
 export function jsonLogger(module: string): Logger {
