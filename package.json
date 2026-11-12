@@ -3,7 +3,7 @@
   "private": true,
   "description": "RunwayMind — AI CFO for DAOs on Avalanche Fuji",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "scripts": {
     "build": "forge build && pnpm -r build",

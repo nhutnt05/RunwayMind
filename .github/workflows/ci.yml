@@ -37,7 +37,7 @@ jobs:
           version: 11
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22  # pnpm 11 requires Node >= 22.13
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @runwaymind/backend run prisma:generate
@@ -74,7 +74,7 @@ jobs:
           version: 11
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22  # pnpm 11 requires Node >= 22.13
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: forge build

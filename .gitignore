@@ -26,8 +26,11 @@ next-env.d.ts
 .DS_Store
 *.log
 
-# docs
-docs/
+# docs: engineering spec stays private; CP2 / D6-A1 evidence reports are published
+docs/*
+!docs/CP2_REPORT.md
+!docs/USDC_SMOKE_TEST.md
+!docs/cp2-evidence/
 
 # Playwright E2E (frontend/e2e/stack.ts)
 frontend/.next-e2e/

@@ -7,7 +7,7 @@ only capital that is genuinely idle within a safety horizon, pulls funds back be
 obligations on-chain on the due date. An AI agent recommends and executes treasury moves, but every limit it works
 within — reserve ratio, deadlines, exposure, whitelist, no outbound transfers, circuit breaker — is enforced by smart
 contracts on Avalanche, so even a hacked agent cannot move funds out. Built for Team1 Vietnam UniHack 2026 (Avalanche,
-track: AI Agents & Security). Full engineering specification: [docs/](docs/README.md).
+track: AI Agents & Security). Full engineering specification: `docs/` (kept private by the team).
 
 | | |
 |---|---|
@@ -89,7 +89,7 @@ flowchart TB
 
 Monorepo (pnpm workspaces): `contracts/` (Solidity 0.8.24, Foundry, OpenZeppelin 5.1), `packages/shared` (types, zod
 schemas, ABIs, deployments), `agent/` (pure engines, orchestrator, executor, keeper, LLM), `backend/` (Fastify 4,
-Prisma 5), `frontend/` (Next.js 14, wagmi 2, RainbowKit 2, TanStack Query 5, Recharts). Layout: [docs/14](docs/14_ENVIRONMENT_AND_REPOSITORY_STRUCTURE.md).
+Prisma 5), `frontend/` (Next.js 14, wagmi 2, RainbowKit 2, TanStack Query 5, Recharts). Layout: docs/14 (private spec).
 
 ## Security model
 
@@ -108,23 +108,23 @@ There is no transfer, sweep, approve, `receive` or `fallback` on the Treasury; t
 
 Hacked-agent demo: `pnpm demo:attack` sends five attacks with the AGENT key (transferFrom, direct adapter withdraw, raw
 `transfer` selector, fake obligation, invest beyond reserve). All five revert on-chain, the last with
-`ReserveViolation`. Details: [docs/03](docs/03_POLICY_ENGINE_SECURITY.md).
+`ReserveViolation`. Rehearsal evidence (tx hashes): [docs/CP2_REPORT.md](docs/CP2_REPORT.md).
 
 ## Deployed contracts — Avalanche Fuji (43113)
 
 All contracts are verified on Snowtrace. Machine-readable copies: [deployment/fuji.json](deployment/fuji.json),
 [deployment/fuji-usdc.json](deployment/fuji-usdc.json).
 
-**Demo treasury (MockUSDC, demo mode)** — deploy block `60880334`
+**Demo treasury (MockUSDC, demo mode)** — deploy block `60935515` (CP2 Run 2, [docs/CP2_REPORT.md](docs/CP2_REPORT.md))
 
 | Contract | Address |
 |---|---|
-| Treasury | [`0xDBb9Ddc80FCBeacCB6588aFB04eBefb7d6795B9f`](https://testnet.snowtrace.io/address/0xDBb9Ddc80FCBeacCB6588aFB04eBefb7d6795B9f) |
-| ObligationRegistry | [`0x837b79bc6f00729287D6cb5F267c291B73473175`](https://testnet.snowtrace.io/address/0x837b79bc6f00729287D6cb5F267c291B73473175) |
-| PolicyEngine | [`0xc4b05a6c0528af3a6dB59912Fa5C6AA5342937d1`](https://testnet.snowtrace.io/address/0xc4b05a6c0528af3a6dB59912Fa5C6AA5342937d1) |
-| VaultAdapter | [`0xE1729AD0752E8B32F9f38D4e7907573bFef5d520`](https://testnet.snowtrace.io/address/0xE1729AD0752E8B32F9f38D4e7907573bFef5d520) |
-| MockLendingPool | [`0x68d62FC0ed6C334B64B11b242580846c7a5894CF`](https://testnet.snowtrace.io/address/0x68d62FC0ed6C334B64B11b242580846c7a5894CF) |
-| MockUSDC (6 decimals) | [`0x2ef65B3767c1b18eCd3647d02ee1a8bBd2B6D01e`](https://testnet.snowtrace.io/address/0x2ef65B3767c1b18eCd3647d02ee1a8bBd2B6D01e) |
+| Treasury | [`0xea19CD2eE794e29c977f85d867BF730Cf65eab92`](https://testnet.snowtrace.io/address/0xea19CD2eE794e29c977f85d867BF730Cf65eab92) |
+| ObligationRegistry | [`0x4B0e94ECCf64175385374F091c1A424c9543FA36`](https://testnet.snowtrace.io/address/0x4B0e94ECCf64175385374F091c1A424c9543FA36) |
+| PolicyEngine | [`0xa862F86092Aa6625A771f964cDAaa50a36BbFA53`](https://testnet.snowtrace.io/address/0xa862F86092Aa6625A771f964cDAaa50a36BbFA53) |
+| VaultAdapter | [`0x31762954AdDD4FbAB318B9Ac375083434BA01d66`](https://testnet.snowtrace.io/address/0x31762954AdDD4FbAB318B9Ac375083434BA01d66) |
+| MockLendingPool | [`0x7300607b351A7D0295b81A798264b35B54d91fDa`](https://testnet.snowtrace.io/address/0x7300607b351A7D0295b81A798264b35B54d91fDa) |
+| MockUSDC (6 decimals) | [`0x561c9B3C8532C577a4b65D0b1E881FB485e58B50`](https://testnet.snowtrace.io/address/0x561c9B3C8532C577a4b65D0b1E881FB485e58B50) |
 
 **Real-USDC treasury (Circle USDC `0x5425890298aed601595a70AB815c96711a31Bc65`)** — deploy block `60926117`,
 smoke test: [docs/USDC_SMOKE_TEST.md](docs/USDC_SMOKE_TEST.md)
@@ -148,7 +148,7 @@ The `AaveV3Adapter` proves the same Treasury works with a real protocol on an Av
 
 ## Run locally (Windows PowerShell)
 
-Requirements: Node ≥ 20, pnpm, Foundry (`forge`, `anvil`, `cast`).
+Requirements: Node ≥ 22.13 (pnpm 11), pnpm, Foundry (`forge`, `anvil`, `cast`).
 
 ```powershell
 pnpm install
