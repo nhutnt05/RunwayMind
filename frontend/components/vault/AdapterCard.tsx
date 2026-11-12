@@ -6,7 +6,7 @@ import { useReadContract } from 'wagmi';
 import type { Address } from 'viem';
 import { parseUsdc } from '@runwaymind/shared';
 import { vaultAdapterAbi } from '@runwaymind/shared/abi';
-import { AddressChip, AmountText, StateChip } from '@/components/ui';
+import { AddressChip, AmountText, GatedButton, StateChip } from '@/components/ui';
 import { useAdminWrite, useVaultAgentAction } from '@/hooks/useAdminWrite';
 import { api, ApiError, type TreasuryOverview, type VaultActionResponse } from '@/lib/api';
 import { appChain } from '@/lib/chains';
@@ -93,7 +93,7 @@ export function AdapterCard({
     <article aria-label={adapter.name} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">{adapter.name}</h3>
+          <h2 className="text-base font-semibold text-slate-900">{adapter.name}</h2>
           <AddressChip address={adapter.address} />
         </div>
         <div className="flex gap-1">
@@ -137,15 +137,15 @@ export function AdapterCard({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className={`${btn} border border-slate-300`} disabled={disabled} title={gate.reason ?? undefined} onClick={() => open('withdraw')}>
+        <GatedButton gate={gate} className={`${btn} border border-slate-300`} disabled={disabled} onClick={() => open('withdraw')}>
           Withdraw
-        </button>
-        <button type="button" className={`${btn} border border-slate-300`} disabled={disabled || adapter.balance === '0'} title={gate.reason ?? undefined} onClick={() => open('withdrawAll')}>
+        </GatedButton>
+        <GatedButton gate={gate} className={`${btn} border border-slate-300`} disabled={disabled || adapter.balance === '0'} onClick={() => open('withdrawAll')}>
           Withdraw all
-        </button>
-        <button type="button" className={`${btn} bg-slate-900 text-white`} disabled={disabled || adapter.status !== 'ACTIVE'} title={gate.reason ?? undefined} onClick={() => open('invest')}>
+        </GatedButton>
+        <GatedButton gate={gate} className={`${btn} bg-slate-900 text-white`} disabled={disabled || adapter.status !== 'ACTIVE'} onClick={() => open('invest')}>
           Invest
-        </button>
+        </GatedButton>
       </div>
 
       {dialog ? (

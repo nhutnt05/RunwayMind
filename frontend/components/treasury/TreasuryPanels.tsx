@@ -2,7 +2,7 @@
 
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatUsdc } from '@runwaymind/shared';
-import { AddressChip, AmountText, SnowtraceLink, StateChip } from '@/components/ui';
+import { AddressChip, AmountText, GatedButton, SnowtraceLink, StateChip } from '@/components/ui';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminWrite } from '@/hooks/useAdminWrite';
 import type { TreasuryOverview } from '@/lib/api';
@@ -21,7 +21,7 @@ export function AddressList({ overview }: { overview: TreasuryOverview }) {
   ];
   return (
     <section aria-label="Contracts and roles" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-2 text-sm font-semibold text-slate-900">Contracts &amp; roles</h3>
+      <h2 className="mb-2 text-sm font-semibold text-slate-900">Contracts &amp; roles</h2>
       <dl className="space-y-2 text-sm">
         {rows
           .filter((r): r is [string, string] => Boolean(r[1]))
@@ -50,7 +50,7 @@ export function AllocationDonut({ idle, vault, decimals }: { idle: string; vault
   ];
   return (
     <section aria-label="Allocation" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-2 text-sm font-semibold text-slate-900">Idle vs vault</h3>
+      <h2 className="mb-2 text-sm font-semibold text-slate-900">Idle vs vault</h2>
       <div className="h-56">
         <ResponsiveContainer>
           <PieChart>
@@ -74,7 +74,7 @@ export function AllocationDonut({ idle, vault, decimals }: { idle: string; vault
 export function AdapterTable({ overview }: { overview: TreasuryOverview }) {
   return (
     <section aria-label="Adapters" className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <h3 className="px-4 pt-4 text-sm font-semibold text-slate-900">Adapters &amp; policy</h3>
+      <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">Adapters &amp; policy</h2>
       <table className="mt-2 w-full text-left text-sm">
         <thead className="text-xs text-slate-600">
           <tr>
@@ -133,35 +133,33 @@ export function BreakerPanel({ active }: { active: boolean }) {
   return (
     <section aria-label="Circuit breaker" className={`rounded-xl border p-4 shadow-sm ${active ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white'}`}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-900">Circuit breaker (R6)</h3>
+        <h2 className="text-sm font-semibold text-slate-900">Circuit breaker (R6)</h2>
         <StateChip state={active ? 'TRIPPED' : 'NORMAL'} tone={active ? 'danger' : 'success'} />
       </div>
       <p className="mt-1 text-xs text-slate-600">
         While tripped, no new investments are possible; withdrawals and payments keep working. ADMIN or AGENT can trip; only ADMIN can reset.
       </p>
       <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          disabled={!gate.enabled || busy || active}
-          title={gate.reason ?? undefined}
+        <GatedButton
+          gate={gate}
+          disabled={busy || active}
           onClick={() => {
             if (window.confirm('Trip the circuit breaker? New investments will be blocked until an ADMIN resets it.')) {
               write.mutate({ title: 'Trip circuit breaker', contract: 'Treasury', call: { functionName: 'tripCircuitBreaker', args: [] } });
             }
           }}
-          className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white"
         >
           Trip
-        </button>
-        <button
-          type="button"
-          disabled={!gate.enabled || busy || !active}
-          title={gate.reason ?? undefined}
+        </GatedButton>
+        <GatedButton
+          gate={gate}
+          disabled={busy || !active}
           onClick={() => write.mutate({ title: 'Reset circuit breaker', contract: 'Treasury', call: { functionName: 'resetCircuitBreaker', args: [] } })}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium"
         >
           Reset
-        </button>
+        </GatedButton>
       </div>
       {write.error ? (
         <p role="alert" className="mt-2 text-xs text-red-800">
@@ -177,7 +175,7 @@ export function ClockPanel({ chainTime, timeOffset, demoMode }: { chainTime: num
   const iso = (t: number) => new Date(t * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
   return (
     <section aria-label="Clock" className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-      <h3 className="mb-2 font-semibold text-slate-900">Clock</h3>
+      <h2 className="mb-2 font-semibold text-slate-900">Clock</h2>
       <p>
         Chain time: <span className="tabular-nums">{iso(chainTime)}</span>
       </p>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { TransactionKind, TransactionStatus } from '@runwaymind/shared';
-import { AddressChip, EmptyState, ErrorState, PageHeader, Skeleton, SnowtraceLink, StateChip, TxStatusBadge } from '@/components/ui';
+import { AddressChip, EmptyState, ErrorState, PageHeader, SkeletonCard, SnowtraceLink, StateChip, TxStatusBadge } from '@/components/ui';
 import { useKeeperStatus, useTransactions } from '@/hooks/useApiQueries';
 import { deployment } from '@/lib/contracts';
 import { formatDecodedError } from '@/lib/preparedTx';
@@ -44,7 +44,7 @@ export default function TransactionsPage() {
     <>
       <PageHeader title="Transactions" description="Every Treasury, registry, policy and demo transaction with role, status and decoded events." />
 
-      <div className="mb-4 flex flex-wrap gap-4 text-sm">
+      <div className="mb-4 flex flex-wrap gap-4 text-sm font-medium text-slate-700">
         <label className="flex items-center gap-2">
           Kind
           <select
@@ -86,12 +86,16 @@ export default function TransactionsPage() {
       {txs.isError && !txs.data ? (
         <ErrorState title="Could not load transactions" message={(txs.error as Error).message} onRetry={() => void txs.refetch()} />
       ) : !txs.data ? (
-        <Skeleton className="h-64 w-full" />
+        <SkeletonCard label="transactions" lines={6} />
       ) : items.length === 0 ? (
-        <EmptyState title="No transactions" description="Transactions appear here once they are sent or indexed." />
+        <EmptyState
+          title="No transactions"
+          description={kind || status ? 'No transactions match these filters.' : 'Transactions appear here once they are sent or indexed.'}
+        />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
+            <caption className="sr-only">Transactions, newest first</caption>
             <thead className="text-xs text-slate-600">
               <tr>
                 <th className="px-4 py-2">Kind</th>

@@ -6,7 +6,7 @@ export function EfficiencyGauge({ actualBps, targetBps }: { actualBps: number; t
   const target = Math.min(100, targetBps / 100);
   return (
     <section aria-label="Capital efficiency" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-600">Capital efficiency</h3>
+      <h2 className="text-sm font-medium text-slate-600">Capital efficiency</h2>
       <p className="mt-1 text-lg font-semibold text-slate-900">{efficiencyLabel(actualBps, targetBps)}</p>
       <div
         className="relative mt-3 h-3 rounded-full bg-slate-100"

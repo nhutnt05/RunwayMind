@@ -84,7 +84,11 @@ describe('RecommendationCard role gating', () => {
     for (const x of b) {
       expect(x.tag).toMatch(/disabled=""/);
       expect(x.tag).toContain('title="Requires ADMIN role"');
+      expect(x.tag).toMatch(/aria-describedby="[^"]+"/);
     }
+    // Styled hover tooltip + visible reason next to the buttons (keyboard users cannot focus disabled buttons).
+    expect(html).toMatch(/role="tooltip"[^>]*>.*Requires ADMIN role<\/span>/);
+    expect(html).toMatch(/text-xs text-slate-700">.*Requires ADMIN role<\/span>/);
   });
 
   it('busy state disables buttons even for ADMIN', () => {

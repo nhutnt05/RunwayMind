@@ -1,7 +1,7 @@
 'use client';
 
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { AddressChip, AmountText, EmptyState, ErrorState, PageHeader, Skeleton, StateChip } from '@/components/ui';
+import { AddressChip, AmountText, EmptyState, ErrorState, PageHeader, Skeleton, SkeletonGrid, StateChip } from '@/components/ui';
 import { usePool, usePools, useOverview, type PoolDetailJson, type PoolJson } from '@/hooks/useApiQueries';
 import { dayLabel } from '@/lib/dashboard';
 import { bpsToPercentText } from '@/lib/views';
@@ -32,12 +32,12 @@ function RiskComponentBars({ risk }: { risk: PoolDetailJson['risk'] }) {
     ['TVL', risk.components.tvl, '20%'],
   ];
   return (
-    <div className="space-y-2" aria-label="Risk components">
+    <div role="group" className="space-y-2" aria-label="Risk components">
       {rows.map(([label, value, weight]) => (
         <div key={label}>
           <div className="flex justify-between text-xs text-slate-700">
             <span>
-              {label} <span className="text-slate-500">(weight {weight})</span>
+              {label} <span className="text-slate-600">(weight {weight})</span>
             </span>
             <span className="tabular-nums">{value.toFixed(2)}</span>
           </div>
@@ -49,7 +49,7 @@ function RiskComponentBars({ risk }: { risk: PoolDetailJson['risk'] }) {
       <p className="text-xs text-slate-600">
         Paused gate: {risk.components.paused ? <StateChip state="PAUSED → score 0" tone="danger" /> : 'not paused'} · samples used {risk.samplesUsed} / 20
       </p>
-      <p className="text-xs text-slate-500">Bands: HEALTHY ≥ 70 (may invest) · WATCH 40–69 (hold) · CRITICAL &lt; 40 (withdraw all)</p>
+      <p className="text-xs text-slate-600">Bands: HEALTHY ≥ 70 (may invest) · WATCH 40–69 (hold) · CRITICAL &lt; 40 (withdraw all)</p>
     </div>
   );
 }
@@ -86,7 +86,7 @@ function PoolCard({ pool, demoStartTime }: { pool: PoolJson; demoStartTime: numb
     <article aria-label={pool.name} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-slate-900">{pool.name}</h3>
+          <h2 className="font-semibold text-slate-900">{pool.name}</h2>
           <AddressChip address={pool.address} />
         </div>
         <StateChip state={pool.band} />
@@ -109,7 +109,13 @@ function PoolCard({ pool, demoStartTime }: { pool: PoolJson; demoStartTime: numb
             </dd>
           </dl>
         </div>
-        {d ? <RiskComponentBars risk={d.risk} /> : <Skeleton className="h-32 w-full" />}
+        {d ? (
+          <RiskComponentBars risk={d.risk} />
+        ) : detail.isError ? (
+          <ErrorState title="Could not load risk details" onRetry={() => void detail.refetch()} />
+        ) : (
+          <Skeleton className="h-32 w-full" />
+        )}
       </div>
       <div className="mt-3">{d ? <RiskHistoryChart detail={d} demoStartTime={demoStartTime} /> : null}</div>
     </article>
@@ -126,7 +132,7 @@ export default function PoolsPage() {
       {pools.isError && !list ? (
         <ErrorState title="Could not load pools" message={(pools.error as Error).message} onRetry={() => void pools.refetch()} />
       ) : !list ? (
-        <Skeleton className="h-64 w-full" />
+        <SkeletonGrid label="pool risk scores" count={2} className="grid grid-cols-1 gap-4 xl:grid-cols-2" />
       ) : list.length === 0 ? (
         <EmptyState title="No pool risk data yet" description="Risk scores appear after the agent samples pool metrics." />
       ) : (

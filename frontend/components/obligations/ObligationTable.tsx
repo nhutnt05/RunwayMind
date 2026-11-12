@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { UpdateObligationRequestSchema } from '@runwaymind/shared';
-import { AddressChip, AmountText, EmptyState, StateChip } from '@/components/ui';
+import { AddressChip, AmountText, EmptyState, GatedButton, StateChip } from '@/components/ui';
 import { useRegistryWrite } from '@/hooks/useRegistryWrite';
 import { api, type ObligationItem, type PrepareTxResponse } from '@/lib/api';
 import { countdown, dayLabel } from '@/lib/dashboard';
@@ -58,26 +58,24 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate }:
   const actions = (o: ObligationItem) =>
     o.status === 'ACTIVE' ? (
       <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={!gate.enabled || write.isPending}
-          title={gate.reason ?? undefined}
+        <GatedButton
+          gate={gate}
+          disabled={write.isPending}
           onClick={() => setEditing(editing === o.id ? null : o.id)}
-          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100"
           aria-label={`Edit obligation ${o.metadata?.label ?? o.id}`}
         >
           Edit
-        </button>
-        <button
-          type="button"
-          disabled={!gate.enabled || write.isPending}
-          title={gate.reason ?? undefined}
+        </GatedButton>
+        <GatedButton
+          gate={gate}
+          disabled={write.isPending}
           onClick={() => cancel(o)}
-          className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50"
           aria-label={`Cancel obligation ${o.metadata?.label ?? o.id}`}
         >
           Cancel
-        </button>
+        </GatedButton>
       </div>
     ) : null;
 

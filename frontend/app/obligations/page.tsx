@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { CreateObligationForm } from '@/components/obligations/CreateObligationForm';
 import { NaturalLanguageInput } from '@/components/obligations/NaturalLanguageInput';
 import { ObligationTable } from '@/components/obligations/ObligationTable';
-import { ErrorState, PageHeader, Skeleton } from '@/components/ui';
+import { AdminGateNotice, ErrorState, PageHeader, SkeletonCard } from '@/components/ui';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useOverview } from '@/hooks/useApiQueries';
 import { useTreasuryReads } from '@/hooks/useTreasuryReads';
@@ -32,6 +32,7 @@ export default function ObligationsPage() {
   return (
     <>
       <PageHeader title="Obligation Management" description="Register, edit and cancel payroll, grants and invoices." />
+      <AdminGateNotice gate={gate} context="Creating, editing and cancelling obligations is disabled." />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8">
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -42,7 +43,7 @@ export default function ObligationsPage() {
               id="ob-status"
               value={status}
               onChange={(e) => setStatus(e.target.value as StatusFilter)}
-              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
             >
               {STATUS_FILTERS.map((s) => (
                 <option key={s} value={s}>
@@ -65,7 +66,7 @@ export default function ObligationsPage() {
               onRetry={() => void obligations.refetch()}
             />
           ) : (
-            <Skeleton className="h-64 w-full" />
+            <SkeletonCard label="obligations" lines={5} />
           )}
         </div>
         <div className="space-y-6 xl:col-span-4">

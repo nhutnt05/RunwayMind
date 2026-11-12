@@ -19,6 +19,8 @@ import type { AgentStore, KeeperRunError } from '../orchestrator/store';
 
 export const MAX_PAYS_PER_TICK = 5;
 
+const isInsufficientLiquidity = (e: KeeperRunError['error']): boolean => typeof e === 'object' && e !== null && e.name === 'InsufficientLiquidity';
+
 export interface KeeperDeps {
   client: PublicClient;
   wallet: AgentWallet;
@@ -141,8 +143,26 @@ export function createKeeper(deps: KeeperDeps) {
         for (const ob of due) {
           let current = ob;
           while (current.status === 'ACTIVE' && current.nextDueDate <= state.chainTime && pays < maxPays) {
-            const res = await send('pay', [current.id], runId);
+            let res = await send('pay', [current.id], runId);
             if (res.hash) txHashes.push(res.hash);
+            // docs/01 §9: pay() reverts InsufficientLiquidity → enforceDeadlines() then retry the pay once; else alert.
+            if (!res.ok && isInsufficientLiquidity(res.error)) {
+              const enf = await send('enforceDeadlines', [], runId);
+              if (enf.hash) txHashes.push(enf.hash);
+              if (enf.ok) {
+                enforced = true;
+                await deps.audit.record(
+                  'KEEPER_ENFORCE',
+                  { txHash: enf.hash, trigger: 'PAY_INSUFFICIENT_LIQUIDITY', obligationId: current.id, chainTime: state.chainTime },
+                  { actor: deps.wallet.account.address, entityType: 'KEEPER', entityId: runId },
+                );
+              } else {
+                errors.push({ step: 'enforceDeadlines', error: enf.error });
+              }
+              res = await send('pay', [current.id], runId);
+              if (res.hash) txHashes.push(res.hash);
+              if (!res.ok) log.error('keeper alert: pay still failing after enforceDeadlines retry', { obligationId: current.id, error: res.error });
+            }
             if (!res.ok) {
               errors.push({ step: 'pay', obligationId: current.id.toString(), error: res.error });
               log.warn('keeper pay failed', { obligationId: current.id, error: res.error });

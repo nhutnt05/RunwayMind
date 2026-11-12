@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
+import { EmptyState, ErrorState, Skeleton, SkeletonCard } from '@/components/ui';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useDecideRecommendation, usePendingRecommendations, useRecommendation } from '@/hooks/useRecommendations';
 import type { AgentDecisionJson } from '@/lib/api';
@@ -62,13 +62,13 @@ export function RecommendationList() {
 
   return (
     <section aria-label="Agent recommendations" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-600">Agent recommendations</h3>
+      <h2 className="text-sm font-medium text-slate-600">Agent recommendations</h2>
       <div className="mt-3 space-y-3">
         {tracked.map((id) => (
           <TrackedRecommendation key={id} id={id} nowSec={nowSec} gate={gate} />
         ))}
         {pending.isLoading ? (
-          <Skeleton className="h-28 w-full" />
+          <SkeletonCard label="agent recommendations" lines={3} />
         ) : pending.isError && !pending.data ? (
           <ErrorState
             title="Could not load recommendations"

@@ -15,7 +15,7 @@ export function UpcomingObligationsList({
   const next = [...obligations].sort((a, b) => a.nextDueDate - b.nextDueDate).slice(0, 5);
   return (
     <section aria-label="Upcoming obligations" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-600">Upcoming obligations</h3>
+      <h2 className="text-sm font-medium text-slate-600">Upcoming obligations</h2>
       {next.length === 0 ? (
         <div className="mt-3">
           <EmptyState

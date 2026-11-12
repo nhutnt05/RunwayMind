@@ -11,6 +11,7 @@ import {
 import { useRegistryWrite } from '@/hooks/useRegistryWrite';
 import { api, type PrepareTxResponse } from '@/lib/api';
 import { intervalLabel } from '@/lib/obligationForm';
+import { GatedButton } from '@/components/ui';
 import type { AdminGate } from '@/lib/recommendations';
 import { WARNING_TEXT, draftDueDate, draftToCreateRequest, type DraftJson } from '@/lib/insights';
 
@@ -73,7 +74,7 @@ export function NaturalLanguageInput({ gate }: { gate: AdminGate }) {
   return (
     <section aria-label="Natural language input" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-900">Describe obligations in plain language</h3>
+        <h2 className="text-sm font-semibold text-slate-900">Describe obligations in plain language</h2>
         <div role="group" aria-label="Language" className="flex gap-1">
           {(['vi', 'en'] as const).map((l) => (
             <button key={l} type="button" aria-pressed={locale === l} onClick={() => setLocale(l)} className={`rounded-md px-2 py-0.5 text-xs ${locale === l ? 'bg-slate-900 text-white' : 'border border-slate-300'}`}>
@@ -91,15 +92,14 @@ export function NaturalLanguageInput({ gate }: { gate: AdminGate }) {
         onChange={(e) => setText(e.target.value)}
       />
       <div className="mt-2 flex items-center gap-2">
-        <button
-          type="button"
-          disabled={!gate.enabled || !text.trim() || parse.isPending}
-          title={gate.reason ?? undefined}
+        <GatedButton
+          gate={gate}
+          disabled={!text.trim() || parse.isPending}
           onClick={() => parse.mutate()}
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white"
         >
           {parse.isPending ? 'Reading…' : 'Create drafts'}
-        </button>
+        </GatedButton>
         <span className="text-xs text-slate-500">{text.length}/2000 · AI suggests, you review and sign</span>
       </div>
       {parse.error ? (
@@ -156,14 +156,16 @@ export function NaturalLanguageInput({ gate }: { gate: AdminGate }) {
                   {r.error}
                 </p>
               ) : null}
-              <button
-                type="button"
-                disabled={!gate.enabled || write.isPending || r.state === 'done' || r.state === 'signing'}
-                onClick={() => void sign(r)}
-                className="mt-2 rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-              >
-                {r.state === 'done' ? 'Created ✓' : r.state === 'signing' ? 'Signing…' : 'Confirm & sign'}
-              </button>
+              <div className="mt-2">
+                <GatedButton
+                  gate={gate}
+                  disabled={write.isPending || r.state === 'done' || r.state === 'signing'}
+                  onClick={() => void sign(r)}
+                  className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white"
+                >
+                  {r.state === 'done' ? 'Created ✓' : r.state === 'signing' ? 'Signing…' : 'Confirm & sign'}
+                </GatedButton>
+              </div>
             </li>
           ))}
         </ol>

@@ -36,7 +36,7 @@ export function AccruedYieldTicker() {
   const value = s ? tickAccruedYield(s.base, s.vault, s.apy, (now - s.at) / 1000) : null;
   return (
     <section aria-label="Accrued yield" className="h-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-600">Accrued yield</h3>
+      <h2 className="text-sm font-medium text-slate-600">Accrued yield</h2>
       <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-700" aria-live="off">
         {value === null ? '—' : `+${formatUsdc(value, 6, 6)}`}
         {value === null ? null : <span className="ml-1 text-sm font-normal text-slate-600">USDC</span>}

@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AgentSettingsUpdateSchema, formatUsdc } from '@runwaymind/shared';
-import { AddressChip, AmountText, EmptyState, SnowtraceLink, StateChip } from '@/components/ui';
+import { AddressChip, AmountText, EmptyState, GatedButton, SnowtraceLink, StateChip } from '@/components/ui';
 import { api, type AgentSettingsJson, type KeeperStatusJson } from '@/lib/api';
 import type { AdminGate } from '@/lib/recommendations';
 import { activityError, blockedLabel, filterActivity, isBlocked, type ActivityItemJson, type ActivityType } from '@/lib/views';
@@ -22,7 +22,7 @@ export function ModeSwitch({ settings, gate }: { settings: AgentSettingsJson | u
   return (
     <section aria-label="Agent mode" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">Mode</h3>
+        <h2 className="text-sm font-semibold text-slate-900">Mode</h2>
         {mode ? <StateChip state={mode} tone={mode === 'AUTO' ? 'warning' : 'info'} /> : null}
       </div>
       <p className="mt-1 text-xs text-slate-600">
@@ -30,11 +30,10 @@ export function ModeSwitch({ settings, gate }: { settings: AgentSettingsJson | u
           ? 'AUTO: the agent executes its own decisions. On-chain rules R1–R6 still apply.'
           : 'APPROVE: every recommendation waits for an ADMIN approval.'}
       </p>
-      <button
-        type="button"
-        disabled={!gate.enabled || !mode || change.isPending}
-        title={gate.reason ?? undefined}
-        className="mt-3 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+      <GatedButton
+        gate={gate}
+        disabled={!mode || change.isPending}
+        className="mt-3 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium"
         onClick={() => {
           const msg =
             next === 'AUTO'
@@ -44,7 +43,7 @@ export function ModeSwitch({ settings, gate }: { settings: AgentSettingsJson | u
         }}
       >
         Switch to {next}
-      </button>
+      </GatedButton>
       {change.error ? (
         <p role="alert" className="mt-2 text-xs text-red-800">
           {(change.error as Error).message}
@@ -63,7 +62,7 @@ export function KeeperStatusCard({ status, gate }: { status: KeeperStatusJson | 
   return (
     <section aria-label="Keeper status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-slate-900">Keeper</h3>
+        <h2 className="font-semibold text-slate-900">Keeper</h2>
         <StateChip state={status?.enabled ? 'ENABLED' : 'DISABLED'} tone={status?.enabled ? 'success' : 'neutral'} />
       </div>
       {status?.keeperAddress ? (
@@ -86,15 +85,14 @@ export function KeeperStatusCard({ status, gate }: { status: KeeperStatusJson | 
           {status.lastError}
         </p>
       ) : null}
-      <button
-        type="button"
-        disabled={!gate.enabled || !status?.enabled || run.isPending}
-        title={gate.reason ?? undefined}
-        className="mt-3 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+      <GatedButton
+        gate={gate}
+        disabled={!status?.enabled || run.isPending}
+        className="mt-3 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium"
         onClick={() => run.mutate()}
       >
         {run.isPending ? 'Running…' : 'Run keeper now'}
-      </button>
+      </GatedButton>
     </section>
   );
 }
@@ -149,7 +147,7 @@ export function ActivityTimeline({ items }: { items: ActivityItemJson[] }) {
   return (
     <section aria-label="Activity timeline" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-900">Activity</h3>
+        <h2 className="text-sm font-semibold text-slate-900">Activity</h2>
         <div role="group" aria-label="Filter activity" className="flex gap-1">
           {FILTERS.map((f) => (
             <button

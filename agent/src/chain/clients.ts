@@ -26,9 +26,16 @@ export function chainFor(chainId: number, rpcUrl: string): Chain {
   });
 }
 
+/** docs/01 §9 RPC row: viem `fallback` over 2 RPC URLs; 3 retries on timeout / rate limit. */
+export const RPC_RETRY_COUNT = 3;
+
 export function transportFor(rpcUrl: string, fallbackUrl?: string): Transport {
-  const opts = { retryCount: 2, timeout: 10_000 } as const;
-  return fallbackUrl ? fallback([http(rpcUrl, opts), http(fallbackUrl, opts)], { rank: false }) : http(rpcUrl, opts);
+  const timeout = 10_000;
+  if (!fallbackUrl) return http(rpcUrl, { retryCount: RPC_RETRY_COUNT, timeout });
+  // With a fallback URL a timeout / 429 on the primary fails over immediately (no per-URL retries); the whole
+  // primary → fallback round is retried RPC_RETRY_COUNT times (each URL is tried at most 1 + 3 times per request).
+  const inner = { retryCount: 0, timeout } as const;
+  return fallback([http(rpcUrl, inner), http(fallbackUrl, inner)], { rank: false, retryCount: RPC_RETRY_COUNT });
 }
 
 export function createChainPublicClient(cfg: Pick<AgentConfig, 'CHAIN_ID' | 'FUJI_RPC_URL' | 'FUJI_RPC_URL_FALLBACK'>): PublicClient {

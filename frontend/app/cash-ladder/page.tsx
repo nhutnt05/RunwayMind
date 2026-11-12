@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { LadderSummary, OccurrencesTable, WithdrawalScheduleTable } from '@/components/cashLadder/LadderTables';
 import { LiquidityProjectionChart } from '@/components/cashLadder/LiquidityProjectionChart';
-import { ErrorState, PageHeader, Skeleton } from '@/components/ui';
+import { ErrorState, PageHeader, SkeletonCard } from '@/components/ui';
 import { useCashLadder, useOverview } from '@/hooks/useApiQueries';
 import { ladderChartRows } from '@/lib/views';
 
@@ -23,9 +23,9 @@ export default function CashLadderPage() {
       <PageHeader title="Cash Ladder" description="Required reserve, investable capital and the withdrawal schedule that keeps every obligation funded." />
 
       <div className="mb-4 flex flex-wrap items-center gap-4 text-sm">
-        <label className="flex items-center gap-2">
+        <label htmlFor="ladder-days" className="flex items-center gap-2 font-medium text-slate-700">
           Projection
-          <select className="rounded-md border border-slate-300 px-2 py-1" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          <select id="ladder-days" className="rounded-md border border-slate-300 bg-white px-2 py-1" value={days} onChange={(e) => setDays(Number(e.target.value))}>
             {PROJECTION_DAYS.map((d) => (
               <option key={d} value={d}>
                 {d} days
@@ -33,8 +33,8 @@ export default function CashLadderPage() {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={includeYield} onChange={(e) => setIncludeYield(e.target.checked)} />
+        <label htmlFor="ladder-yield" className="flex items-center gap-2 font-medium text-slate-700">
+          <input id="ladder-yield" type="checkbox" checked={includeYield} onChange={(e) => setIncludeYield(e.target.checked)} />
           Include projected yield
         </label>
       </div>
@@ -43,8 +43,9 @@ export default function CashLadderPage() {
         <ErrorState title="Could not compute the Cash Ladder" message={(ladder.error as Error).message} onRetry={() => void ladder.refetch()} />
       ) : !l || !o ? (
         <div className="space-y-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-72 w-full" />
+          <SkeletonCard label="ladder summary" lines={2} />
+          <SkeletonCard label="liquidity projection" bodyClassName="h-64" />
+          <SkeletonCard label="withdrawal schedule" lines={3} />
         </div>
       ) : (
         <div className="space-y-4">

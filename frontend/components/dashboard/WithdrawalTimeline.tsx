@@ -15,7 +15,7 @@ export function WithdrawalTimeline({
   if (items.length === 0) {
     return (
       <section aria-label="Withdrawal timeline" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-sm font-medium text-slate-600">Withdrawal timeline</h3>
+        <h2 className="text-sm font-medium text-slate-600">Withdrawal timeline</h2>
         <div className="mt-3">
           <EmptyState title="No upcoming withdrawals" description="Every obligation in the horizon is covered by idle funds." />
         </div>
@@ -25,7 +25,7 @@ export function WithdrawalTimeline({
   const end = Math.max(...items.flatMap((i) => [i.deadline, ...i.covers.map((c) => c.dueDate)]));
   return (
     <section aria-label="Withdrawal timeline" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-600">Withdrawal timeline</h3>
+      <h2 className="text-sm font-medium text-slate-600">Withdrawal timeline</h2>
       <div className="relative mx-2 mt-10 hidden h-1 rounded bg-slate-200 md:block" aria-hidden>
         <span className="absolute -top-6 left-0 -translate-x-1/2 text-xs text-slate-600">{dayLabel(chainTime, demoStartTime)}</span>
         {items.map((item) => (

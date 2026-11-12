@@ -327,6 +327,7 @@ export class PrismaAgentStore implements AgentStore, AuditSink {
 
   // AuditSink
   async write(e: AuditEntry) {
-    await this.repos.audit(e.eventType, e.actor, e.payload, e.entityType && e.entityId ? { type: e.entityType, id: e.entityId } : undefined);
+    // entityType is kept even without an entityId (e.g. a failed NL_PARSE has no draft id), docs/05 §11.
+    await this.repos.audit(e.eventType, e.actor, e.payload, e.entityType ? { type: e.entityType, id: e.entityId ?? null } : undefined);
   }
 }

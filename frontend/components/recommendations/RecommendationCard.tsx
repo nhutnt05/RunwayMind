@@ -1,4 +1,4 @@
-import { AmountText, AddressChip, SnowtraceLink, StateChip } from '@/components/ui';
+import { AmountText, AddressChip, GatedButton, SnowtraceLink, StateChip } from '@/components/ui';
 import type { AgentDecisionJson } from '@/lib/api';
 import { formatDecodedError } from '@/lib/preparedTx';
 import { decisionHeadline, expiryLabel, isActionable, latestAction, type AdminGate } from '@/lib/recommendations';
@@ -26,8 +26,6 @@ export function RecommendationCard({ decision, nowSec, gate, busy = null, error,
   const blocked = decision.status === 'BLOCKED_BY_POLICY';
   const action = latestAction(decision);
   const actionable = isActionable(decision, nowSec);
-  const disabled = !gate.enabled || busy !== null;
-  const title = gate.reason ?? undefined;
   const headingId = `rec-${decision.id}-title`;
 
   return (
@@ -37,9 +35,9 @@ export function RecommendationCard({ decision, nowSec, gate, busy = null, error,
       className={`rounded-xl border p-4 shadow-sm ${blocked ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white'}`}
     >
       <div className="flex flex-wrap items-start gap-2">
-        <h4 id={headingId} className="min-w-0 flex-1 text-sm font-semibold text-slate-900">
+        <h3 id={headingId} className="min-w-0 flex-1 text-sm font-semibold text-slate-900">
           {decisionHeadline(decision)}
-        </h4>
+        </h3>
         <StateChip state={decision.status} />
       </div>
 
@@ -83,25 +81,28 @@ export function RecommendationCard({ decision, nowSec, gate, busy = null, error,
 
       {actionable ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={disabled}
-            title={title}
+          <GatedButton
+            gate={gate}
+            disabled={busy !== null}
             onClick={() => onApprove?.(decision.id)}
-            className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
           >
             {busy === 'approve' ? 'Approving…' : 'Approve'}
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            title={title}
+          </GatedButton>
+          <GatedButton
+            gate={gate}
+            disabled={busy !== null}
             onClick={() => onReject?.(decision.id)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100"
           >
             {busy === 'reject' ? 'Rejecting…' : 'Reject'}
-          </button>
-          {gate.reason ? <span className="text-xs text-slate-600">{gate.reason}</span> : null}
+          </GatedButton>
+          {gate.reason ? (
+            <span className="text-xs text-slate-700">
+              <span aria-hidden>🔒 </span>
+              {gate.reason}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </article>

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useReadContracts } from 'wagmi';
 import { keccak256, toBytes, type Address } from 'viem';
 import { parseUsdc, type PolicyPrepareRequest } from '@runwaymind/shared';
-import { AddressChip, AmountText, StateChip } from '@/components/ui';
+import { AddressChip, AmountText, GatedButton, StateChip } from '@/components/ui';
 import { useAdminWrite } from '@/hooks/useAdminWrite';
 import { api, type AdminPrepareResponse, type TreasuryOverview } from '@/lib/api';
 import { appChain } from '@/lib/chains';
@@ -45,29 +45,27 @@ export function PolicyForm({ overview, gate }: { overview: TreasuryOverview; gat
 
   return (
     <section aria-label="Policy" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-slate-900">Policy (on-chain, ADMIN)</h3>
+      <h2 className="text-sm font-semibold text-slate-900">Policy (on-chain, ADMIN)</h2>
       <Row label="Safety horizon H (days, 1–90)" current={`${Math.floor(overview.policy.safetyHorizonSec / 86_400)} days`}>
         <input aria-label="Safety horizon days" className={input} inputMode="numeric" value={h} onChange={(e) => setH(e.target.value)} />
-        <button
-          type="button"
+        <GatedButton
+          gate={gate}
           className={btn}
           disabled={disabled}
-          title={gate.reason ?? undefined}
           onClick={() => {
             const sec = daysToSeconds(h);
             send('Set safety horizon', sec ? { fn: 'setSafetyHorizon', args: [sec] } : null, 'Enter a whole number of days');
           }}
         >
           Save
-        </button>
+        </GatedButton>
       </Row>
       <Row label="Emergency buffer (USDC)" current={<AmountText value={overview.policy.emergencyBuffer} />}>
         <input aria-label="Emergency buffer" className={input} inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} />
-        <button
-          type="button"
+        <GatedButton
+          gate={gate}
           className={btn}
           disabled={disabled}
-          title={gate.reason ?? undefined}
           onClick={() => {
             let amount: string | null = null;
             try {
@@ -79,22 +77,21 @@ export function PolicyForm({ overview, gate }: { overview: TreasuryOverview; gat
           }}
         >
           Save
-        </button>
+        </GatedButton>
       </Row>
       <Row label="Max exposure per adapter (%)" current={`${bpsToPercentText(overview.policy.maxExposureBps)}%`}>
         <input aria-label="Max exposure percent" className={input} inputMode="decimal" value={exposure} onChange={(e) => setExposure(e.target.value)} />
-        <button
-          type="button"
+        <GatedButton
+          gate={gate}
           className={btn}
           disabled={disabled}
-          title={gate.reason ?? undefined}
           onClick={() => {
             const bps = percentToBps(exposure);
             send('Set max exposure', bps && bps <= 10_000 ? { fn: 'setMaxExposureBps', args: [bps] } : null, 'Enter a percentage between 0.01 and 100');
           }}
         >
           Save
-        </button>
+        </GatedButton>
       </Row>
       {error ? (
         <p role="alert" className="text-xs font-semibold text-red-800">
@@ -112,7 +109,7 @@ export function AdapterWhitelistTable({ overview, gate }: { overview: TreasuryOv
   const [error, setError] = useState<string | null>(null);
   return (
     <section aria-label="Adapter whitelist" className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-slate-900">Adapter whitelist (R4)</h3>
+      <h2 className="text-sm font-semibold text-slate-900">Adapter whitelist (R4)</h2>
       <table className="mt-2 w-full text-left text-sm">
         <thead className="text-xs text-slate-600">
           <tr>
@@ -199,7 +196,7 @@ export function RolesPanel() {
   });
   return (
     <section aria-label="Roles" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-slate-900">Roles (read-only)</h3>
+      <h2 className="text-sm font-semibold text-slate-900">Roles (read-only)</h2>
       <ul className="mt-2 space-y-2 text-sm">
         {rows.map((row, i) => {
           const ok = (reads.data as { result?: unknown }[] | undefined)?.[i]?.result;

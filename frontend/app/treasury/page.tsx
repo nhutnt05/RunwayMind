@@ -1,11 +1,13 @@
 'use client';
 
 import { AdapterTable, AddressList, AllocationDonut, BreakerPanel, ClockPanel } from '@/components/treasury/TreasuryPanels';
-import { ErrorState, PageHeader, Skeleton } from '@/components/ui';
+import { AdminGateNotice, ErrorState, PageHeader, SkeletonGrid } from '@/components/ui';
+import { useAdminGate } from '@/hooks/useAdminGate';
 import { useOverview } from '@/hooks/useApiQueries';
 import { useTreasuryReads } from '@/hooks/useTreasuryReads';
 
 export default function TreasuryPage() {
+  const gate = useAdminGate();
   const overview = useOverview();
   const chain = useTreasuryReads();
   const o = overview.data?.data;
@@ -14,10 +16,11 @@ export default function TreasuryPage() {
   return (
     <>
       <PageHeader title="Treasury" description="Contracts, allocation, adapters, policy parameters and the circuit breaker." />
+      <AdminGateNotice gate={gate} context="Circuit breaker controls are disabled." />
       {overview.isError && !o ? (
         <ErrorState title="Could not load the treasury" message={(overview.error as Error).message} onRetry={() => void overview.refetch()} />
       ) : !o ? (
-        <Skeleton className="h-64 w-full" />
+        <SkeletonGrid label="treasury" count={4} className="grid grid-cols-1 gap-4 lg:grid-cols-2" />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-7">

@@ -31,8 +31,13 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 export function LiquidityProjectionChart({ rows }: { rows: ChartRow[] }) {
   return (
     <section aria-label="Liquidity projection" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-2 text-sm font-semibold text-slate-900">Liquidity projection</h3>
-      <div className="h-72 w-full">
+      <h2 className="mb-2 text-sm font-semibold text-slate-900">Liquidity projection</h2>
+      <p className="sr-only">
+        Chart of projected idle and vault balances against the required reserve, with scheduled payments as bars, from Day{' '}
+        {rows[0]?.day ?? 0} to Day {rows[rows.length - 1]?.day ?? 0}. The withdrawal schedule and occurrence tables below list the exact
+        amounts.
+      </p>
+      <div className="h-72 w-full" aria-hidden>
         <ResponsiveContainer>
           <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

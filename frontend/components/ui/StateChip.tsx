@@ -1,3 +1,5 @@
+import { RiskBadge, isRiskLevel } from './RiskBadge';
+
 // Color is never the only signal (docs/08 §9): every chip shows an icon and text.
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
@@ -35,6 +37,8 @@ const STATE_TONE: Record<string, Tone> = {
 };
 
 export function StateChip({ state, tone }: { state: string; tone?: Tone }) {
+  // Risk classes always render through RiskBadge so SAFE/WATCH/CRITICAL look the same everywhere.
+  if (!tone && isRiskLevel(state)) return <RiskBadge level={state} />;
   const t = tone ?? STATE_TONE[state] ?? 'neutral';
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${TONE_CLASS[t]}`}>

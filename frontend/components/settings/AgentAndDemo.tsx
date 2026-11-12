@@ -8,6 +8,7 @@ import { useAdminWrite } from '@/hooks/useAdminWrite';
 import { api, type AdminPrepareResponse, type AgentSettingsJson } from '@/lib/api';
 import { appChain } from '@/lib/chains';
 import { contracts } from '@/lib/contracts';
+import { GatedButton } from '@/components/ui';
 import type { AdminGate } from '@/lib/recommendations';
 import { bpsToPercentText, percentToBps } from '@/lib/views';
 
@@ -68,13 +69,13 @@ export function AgentSettingsForm({ settings, gate }: { settings: AgentSettingsJ
         disabled={!gate.enabled}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
       />
-      {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
+      {hint ? <span className="text-xs text-slate-600">{hint}</span> : null}
     </label>
   );
 
   return (
     <section aria-label="Agent settings" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-slate-900">Agent (off-chain, ADMIN)</h3>
+      <h2 className="text-sm font-semibold text-slate-900">Agent (off-chain, ADMIN)</h2>
       <form
         className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2"
         onSubmit={(e) => {
@@ -101,14 +102,14 @@ export function AgentSettingsForm({ settings, gate }: { settings: AgentSettingsJ
         {field('preWithdrawLeadDays', 'Pre-withdraw lead (days)', '0–14')}
         {field('loopIntervalSec', 'Agent loop interval (seconds)', '5–600 (demo: 10)')}
         <div className="md:col-span-2">
-          <button
+          <GatedButton
+            gate={gate}
             type="submit"
-            disabled={!gate.enabled || save.isPending}
-            title={gate.reason ?? undefined}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            disabled={save.isPending}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white"
           >
             {save.isPending ? 'Saving…' : 'Save agent settings'}
-          </button>
+          </GatedButton>
           {saved ? <span className="ml-2 text-xs text-emerald-800">Saved (audited).</span> : null}
           {error ? (
             <p role="alert" className="mt-2 text-xs font-semibold text-red-800">
@@ -164,18 +165,17 @@ export function DemoControls({ gate }: { gate: AdminGate }) {
         <div>
           <p className="font-semibold">Advance time</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <button type="button" className={btn} disabled={disabled} title={gate.reason ?? undefined} onClick={() => advance(1)}>
+            <GatedButton gate={gate} className={btn} disabled={disabled} onClick={() => advance(1)}>
               +1 day
-            </button>
-            <button type="button" className={btn} disabled={disabled} title={gate.reason ?? undefined} onClick={() => advance(7)}>
+            </GatedButton>
+            <GatedButton gate={gate} className={btn} disabled={disabled} onClick={() => advance(7)}>
               +7 days
-            </button>
+            </GatedButton>
             <input aria-label="Custom days" className="w-16 rounded-md border border-slate-300 px-2 py-1" inputMode="numeric" value={customDays} onChange={(e) => setCustomDays(e.target.value)} />
-            <button
-              type="button"
+            <GatedButton
+              gate={gate}
               className={btn}
               disabled={disabled}
-              title={gate.reason ?? undefined}
               onClick={() => {
                 const d = /^\d{1,3}$/.test(customDays) ? Number(customDays) : 0;
                 if (d < 1 || d > 365) return setError('Custom advance must be 1–365 days');
@@ -183,7 +183,7 @@ export function DemoControls({ gate }: { gate: AdminGate }) {
               }}
             >
               Advance
-            </button>
+            </GatedButton>
             <span className="text-xs text-slate-600">Time only moves forward.</span>
           </div>
         </div>
@@ -196,9 +196,15 @@ export function DemoControls({ gate }: { gate: AdminGate }) {
               </label>
               <div className="flex items-center gap-2">
                 <input id="demo-apy" type="range" min={0} max={2000} step={25} value={apy} onChange={(e) => setApy(Number(e.target.value))} className="flex-1" />
-                <button type="button" className={btn} disabled={disabled || BigInt(apy) === apyBps} onClick={() => run(`Set APY ${bpsToPercentText(apy)}%`, 'MockLendingPool', { fn: 'setAPY', args: [apy] })}>
+                <GatedButton
+                  gate={gate}
+                  className={btn}
+                  aria-label="Apply pool APY"
+                  disabled={disabled || BigInt(apy) === apyBps}
+                  onClick={() => run(`Set APY ${bpsToPercentText(apy)}%`, 'MockLendingPool', { fn: 'setAPY', args: [apy] })}
+                >
                   Apply
-                </button>
+                </GatedButton>
               </div>
             </div>
             <div>
@@ -207,22 +213,23 @@ export function DemoControls({ gate }: { gate: AdminGate }) {
               </label>
               <div className="flex items-center gap-2">
                 <input id="demo-util" type="range" min={0} max={10_000} step={100} value={util} onChange={(e) => setUtil(Number(e.target.value))} className="flex-1" />
-                <button
-                  type="button"
+                <GatedButton
+                  gate={gate}
                   className={btn}
+                  aria-label="Apply pool utilization"
                   disabled={disabled || BigInt(util) === utilizationBps}
                   onClick={() => run(`Set utilization ${bpsToPercentText(util)}%`, 'MockLendingPool', { fn: 'setUtilization', args: [util] })}
                 >
                   Apply
-                </button>
+                </GatedButton>
               </div>
             </div>
             <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2" title={gate.reason ?? undefined}>
                 <input type="checkbox" checked={Boolean(paused)} disabled={disabled || paused === undefined} onChange={(e) => run(e.target.checked ? 'Pause pool' : 'Unpause pool', 'MockLendingPool', { fn: 'setPaused', args: [e.target.checked] })} />
                 Pool paused
               </label>
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2" title={gate.reason ?? undefined}>
                 <input
                   type="checkbox"
                   checked={Boolean(shortage)}
@@ -238,9 +245,9 @@ export function DemoControls({ gate }: { gate: AdminGate }) {
         )}
 
         <div>
-          <button type="button" className={btn} disabled={disabled} title={gate.reason ?? undefined} onClick={() => run('Reset circuit breaker', 'Treasury', { fn: 'resetCircuitBreaker', args: [] })}>
+          <GatedButton gate={gate} className={btn} disabled={disabled} onClick={() => run('Reset circuit breaker', 'Treasury', { fn: 'resetCircuitBreaker', args: [] })}>
             Reset circuit breaker
-          </button>
+          </GatedButton>
         </div>
         {error ? (
           <p role="alert" className="text-xs font-semibold text-red-800">

@@ -34,7 +34,10 @@ docs/*
 
 # Playwright E2E (frontend/e2e/stack.ts)
 frontend/.next-e2e/
+frontend/.next-a11y/
 frontend/e2e/.state/
 frontend/test-results/
+frontend/test/
 frontend/playwright-report/
 backend/prisma/e2e.db*
+.gas-snapshot

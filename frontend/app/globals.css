@@ -10,7 +10,18 @@ body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
 
-/* Visible keyboard focus everywhere (docs/08 §9). */
+/*
+ * Visible keyboard focus everywhere (docs/08 §9): a 2px sky-700 ring (≈ 5.9:1 on white) with a white offset, so it
+ * stays visible on dark, red and amber controls alike.
+ */
 :focus-visible {
-  @apply outline-none ring-2 ring-brand ring-offset-2;
+  @apply outline-none ring-2 ring-sky-700 ring-offset-2;
+}
+
+/* Users who ask for less motion get static skeletons and spinners. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-spin {
+    animation: none;
+  }
 }

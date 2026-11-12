@@ -285,7 +285,7 @@ export function createRepositories(prisma: PrismaClient, treasuryId: string) {
       });
     },
 
-    async audit(eventType: string, actor: string, payload: unknown, entity?: { type: string; id: string }) {
+    async audit(eventType: string, actor: string, payload: unknown, entity?: { type: string; id?: string | null }) {
       await prisma.auditLog.create({
         data: {
           treasuryId,

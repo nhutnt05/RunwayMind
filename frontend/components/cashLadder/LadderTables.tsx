@@ -36,7 +36,7 @@ export function WithdrawalScheduleTable({ items, demoStartTime }: { items: CashL
   if (!items.length) return <EmptyState title="No withdrawals needed" description="Idle balance already covers every obligation in the horizon." />;
   return (
     <section aria-label="Withdrawal schedule" className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <h3 className="px-4 pt-4 text-sm font-semibold text-slate-900">Withdrawal schedule</h3>
+      <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">Withdrawal schedule</h2>
       <table className="mt-2 w-full text-left text-sm">
         <thead className="text-xs text-slate-600">
           <tr>
@@ -79,7 +79,7 @@ export function OccurrencesTable({ items, demoStartTime }: { items: CashLadderJs
   if (!items.length) return <EmptyState title="No upcoming occurrences" description="Create an obligation to see its projected payments." action={{ label: 'Obligations', href: '/obligations' }} />;
   return (
     <section aria-label="Projected occurrences" className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <h3 className="px-4 pt-4 text-sm font-semibold text-slate-900">Projected occurrences</h3>
+      <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">Projected occurrences</h2>
       <table className="mt-2 w-full text-left text-sm">
         <thead className="text-xs text-slate-600">
           <tr>

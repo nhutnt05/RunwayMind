@@ -1,7 +1,7 @@
 'use client';
 
 import { AdapterCard } from '@/components/vault/AdapterCard';
-import { EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui';
+import { AdminGateNotice, EmptyState, ErrorState, PageHeader, SkeletonGrid } from '@/components/ui';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useOverview } from '@/hooks/useApiQueries';
 import { useTreasuryReads } from '@/hooks/useTreasuryReads';
@@ -16,12 +16,17 @@ export default function VaultPage() {
   return (
     <>
       <PageHeader title="Yield Vault" description="Adapter balances, APY, liquidity and manual invest / withdraw." />
+      <AdminGateNotice gate={gate} context="Invest and withdraw are disabled." />
       {overview.isError && !o ? (
         <ErrorState title="Could not load adapters" message={(overview.error as Error).message} onRetry={() => void overview.refetch()} />
       ) : !o ? (
-        <Skeleton className="h-64 w-full" />
+        <SkeletonGrid label="yield vault adapters" count={2} />
       ) : o.adapters.length === 0 ? (
-        <EmptyState title="No yield vaults" description="Whitelisted adapters appear here after deployment." />
+        <EmptyState
+          title="No yield vaults"
+          description="Whitelisted adapters appear here after deployment. An ADMIN can whitelist one in Settings."
+          action={{ label: 'Open settings', href: '/settings' }}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {o.adapters.map((a) => (

@@ -13,6 +13,7 @@ import {
   createObligationFormSchema,
   type ObligationFormValues,
 } from '@/lib/obligationForm';
+import { GatedButton } from '@/components/ui';
 import type { AdminGate } from '@/lib/recommendations';
 
 const INPUT =
@@ -171,14 +172,14 @@ export function CreateObligationForm({ chainTime, gate }: { chainTime: number | 
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
+        <GatedButton
+          gate={gate}
           type="submit"
-          disabled={!gate.enabled || busy}
-          title={gate.reason ?? undefined}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={busy}
+          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
         >
           {busy ? 'Submitting…' : 'Create & sign'}
-        </button>
+        </GatedButton>
         {gate.reason ? <span className="text-xs text-slate-600">{gate.reason}</span> : null}
       </div>
     </form>
