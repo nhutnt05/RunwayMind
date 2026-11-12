@@ -211,7 +211,12 @@ export async function buildApp(deps: AppDeps) {
     async (api) => {
       api.addHook('onRequest', async (request) => {
         const raw = (request.query as Record<string, unknown> | undefined)?.treasury;
-        const id = typeof raw === 'string' && raw !== '' ? raw : primaryId;
+        // `?treasury=a&treasury=b` (array) must not silently fall back to the primary treasury: an admin action
+        // would then target a treasury the caller did not ask for.
+        if (raw !== undefined && typeof raw !== 'string') {
+          throw new ApiError('VALIDATION_ERROR', 'treasury must be a single treasury id', [{ path: 'treasury', issue: 'invalid_type', message: 'expected one string' }]);
+        }
+        const id = raw !== undefined && raw !== '' ? raw : primaryId;
         const bundle = bundles.get(id);
         if (!bundle) throw new ApiError('NOT_FOUND', `Treasury ${id} not found`);
         request.treasuryBundle = bundle;

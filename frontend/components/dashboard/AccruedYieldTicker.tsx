@@ -27,16 +27,19 @@ export function AccruedYieldTicker() {
     }
   }, [o]);
 
+  // Animate only once there is something to animate (no 4 Hz re-renders while loading / before the indexer runs).
+  const live = Boolean(o?.accruedYield);
   useEffect(() => {
+    if (!live) return;
     const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
-  }, []);
+  }, [live]);
 
   const s = sync.current;
   const value = s ? tickAccruedYield(s.base, s.vault, s.apy, (now - s.at) / 1000) : null;
   return (
-    <section aria-label="Accrued yield" className="h-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-sm font-medium text-slate-600">Accrued yield</h2>
+    <section aria-label="Accrued yield (live)" className="h-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-medium text-slate-600">Accrued yield (live)</h2>
       <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-700" aria-live="off">
         {value === null ? '—' : `+${formatUsdc(value, 6, 6)}`}
         {value === null ? null : <span className="ml-1 text-sm font-normal text-slate-600">USDC</span>}

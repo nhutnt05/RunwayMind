@@ -1,10 +1,17 @@
 'use client';
 
-import { AdapterTable, AddressList, AllocationDonut, BreakerPanel, ClockPanel } from '@/components/treasury/TreasuryPanels';
-import { AdminGateNotice, ErrorState, PageHeader, SkeletonGrid } from '@/components/ui';
+import dynamic from 'next/dynamic';
+import { AdapterTable, AddressList, BreakerPanel, ClockPanel } from '@/components/treasury/TreasuryPanels';
+import { AdminGateNotice, ErrorState, PageHeader, SkeletonCard, SkeletonGrid } from '@/components/ui';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useOverview } from '@/hooks/useApiQueries';
 import { useTreasuryReads } from '@/hooks/useTreasuryReads';
+
+// Recharts (~100 kB) loads after the page shell; a card skeleton holds the space meanwhile.
+const AllocationDonut = dynamic(() => import('@/components/treasury/AllocationDonut').then((m) => m.AllocationDonut), {
+  ssr: false,
+  loading: () => <SkeletonCard label="allocation chart" bodyClassName="h-56" />,
+});
 
 export default function TreasuryPage() {
   const gate = useAdminGate();

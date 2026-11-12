@@ -31,7 +31,8 @@ export interface AdminGate {
 export function adminGate(input: { isConnected: boolean; isAdmin: boolean; isSignedIn: boolean }): AdminGate {
   if (!input.isConnected) return { enabled: false, reason: 'Connect wallet to manage' };
   if (!input.isAdmin) return { enabled: false, reason: 'Requires ADMIN role' };
-  if (!input.isSignedIn) return { enabled: false, reason: 'Sign in (SIWE) to approve or reject' };
+  // The same gate guards every ADMIN control (settings, vault, obligations…), so the reason stays generic.
+  if (!input.isSignedIn) return { enabled: false, reason: 'Sign in (SIWE) to manage' };
   return { enabled: true, reason: null };
 }
 

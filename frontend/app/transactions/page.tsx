@@ -93,7 +93,9 @@ export default function TransactionsPage() {
           description={kind || status ? 'No transactions match these filters.' : 'Transactions appear here once they are sent or indexed.'}
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="relative overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          {/* `relative` contains the sr-only (absolutely positioned) caption; without it the caption escapes the scroll
+              box and widens the page by the table overflow at 375 px. */}
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Transactions, newest first</caption>
             <thead className="text-xs text-slate-600">

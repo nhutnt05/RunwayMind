@@ -1,13 +1,11 @@
 'use client';
 
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { formatUsdc } from '@runwaymind/shared';
 import { AddressChip, AmountText, GatedButton, SnowtraceLink, StateChip } from '@/components/ui';
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminWrite } from '@/hooks/useAdminWrite';
 import type { TreasuryOverview } from '@/lib/api';
 import { contracts, deployment } from '@/lib/contracts';
-import { bpsToPercentText, toChartTokens } from '@/lib/views';
+import { bpsToPercentText } from '@/lib/views';
 
 export function AddressList({ overview }: { overview: TreasuryOverview }) {
   const rows: [string, string | undefined][] = [
@@ -37,36 +35,6 @@ export function AddressList({ overview }: { overview: TreasuryOverview }) {
             </div>
           ))}
       </dl>
-    </section>
-  );
-}
-
-const COLORS = ['#14b8a6', '#6366f1'];
-
-export function AllocationDonut({ idle, vault, decimals }: { idle: string; vault: string; decimals: number }) {
-  const data = [
-    { name: 'Idle', tokens: toChartTokens(idle, decimals), exact: idle },
-    { name: 'Yield vault', tokens: toChartTokens(vault, decimals), exact: vault },
-  ];
-  return (
-    <section aria-label="Allocation" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-2 text-sm font-semibold text-slate-900">Idle vs vault</h2>
-      <div className="h-56">
-        <ResponsiveContainer>
-          <PieChart>
-            <Pie data={data} dataKey="tokens" nameKey="name" innerRadius="55%" outerRadius="80%">
-              {data.map((d, i) => (
-                <Cell key={d.name} fill={COLORS[i]} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(_v, _n, item) => formatUsdc(BigInt((item.payload as { exact: string }).exact), decimals)} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <p className="text-center text-xs text-slate-600">
-        Idle <AmountText value={idle} decimals={decimals} /> · Vault <AmountText value={vault} decimals={decimals} />
-      </p>
     </section>
   );
 }

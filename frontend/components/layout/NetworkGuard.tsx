@@ -2,6 +2,7 @@
 
 import { useAccount, useSwitchChain } from 'wagmi';
 import { appChain } from '@/lib/chains';
+import { describeWriteError } from '@/lib/preparedTx';
 
 // docs/08 §7: if a wallet is connected to any chain other than 43113, show a blocking banner with switchChain.
 export function NetworkGuard() {
@@ -17,13 +18,14 @@ export function NetworkGuard() {
           <span aria-hidden>⚠️ </span>
           <strong>Wrong network.</strong> RunwayMind runs on {appChain.name} (chain ID {appChain.id}). Your wallet is on chain{' '}
           {chainId ?? 'unknown'}.
-          {error ? <span className="block text-red-700">Switch failed: {error.message}</span> : null}
+          {/* Wallet errors can quote the RPC URL (API key): redact like every other wallet error. */}
+          {error ? <span className="block text-red-800">Switch failed: {describeWriteError(error)}</span> : null}
         </p>
         <button
           type="button"
           onClick={() => switchChain({ chainId: appChain.id })}
           disabled={isPending}
-          className="rounded-md bg-red-600 px-3 py-1.5 font-medium text-white hover:bg-red-700 disabled:opacity-60"
+          className="rounded-md bg-red-700 px-3 py-1.5 font-medium text-white hover:bg-red-800 disabled:opacity-60"
         >
           {isPending ? 'Switching…' : `Switch to ${appChain.name}`}
         </button>

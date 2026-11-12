@@ -21,7 +21,7 @@ import { loadDeployment } from '@runwaymind/shared';
 import { buildApp, type TreasuryInput } from './app';
 import { loadBackendConfig } from './config';
 import { createIndexer } from './indexer';
-import { createScheduler } from './scheduler';
+import { createScheduler, failInterruptedExecutions } from './scheduler';
 import { ViemChainService } from './services/chain';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -123,6 +123,7 @@ async function main() {
           indexer,
           getSettings: () => repos.agentSettings(),
           approvedDecisionIds: async () => (await repos.listDecisions({ status: 'APPROVED', limit: 100 })).map((d) => d.id),
+          recoverInterrupted: (before) => failInterruptedExecutions(store, audit, before),
           getBalance: (address) => client.getBalance({ address }),
           keeperIntervalMs: cfg.KEEPER_INTERVAL_SEC * 1000,
           log: tag('scheduler'),

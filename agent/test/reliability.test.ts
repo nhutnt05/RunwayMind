@@ -19,7 +19,7 @@ import { AuditLogger, MemoryAuditSink, type Logger } from '../src/audit/audit';
 import { RPC_RETRY_COUNT, createChainPublicClient } from '../src/chain/clients';
 import { ALL_ERRORS_ABI } from '../src/chain/errors';
 import { Executor } from '../src/executor/executor';
-import { DEFAULT_RETRY_DELAYS_MS, withRetry, type AgentWallet } from '../src/executor/send';
+import { DEFAULT_RETRY_DELAYS_MS, errorMessage, isNonceConsumed, withRetry, type AgentWallet } from '../src/executor/send';
 import { MAX_PAYS_PER_TICK, createKeeper } from '../src/keeper/keeper';
 import { createApprovalService } from '../src/orchestrator/approval';
 import { MemoryAgentStore, type DecisionRecord } from '../src/orchestrator/store';
@@ -516,5 +516,84 @@ describe('expired approvals', () => {
     t.advance(t.store.settings.decisionTtlSec * 10);
     await t.loop.tick();
     expect((await t.store.getDecision(d.id))!.status).toBe('APPROVED');
+  });
+});
+
+// ---- D7 pre-release audit fixes ---------------------------------------------------------------------------------
+
+describe('D7 audit: no duplicate sends, no unhandled rejections, no leaked RPC URLs', () => {
+  it('lost send response (network error after the node accepted the tx) → retried with the SAME nonce, one tx', async () => {
+    const t = executorSetup();
+    t.st.logs = [breakerLog()];
+    t.st.write = (req) => {
+      if (t.st.writes.length === 1) {
+        t.st.nodeNonce = 6; // the node did accept nonce 5; only the HTTP response was lost
+        throw new Error('fetch failed');
+      }
+      return hashOf(req.nonce + 1);
+    };
+    const d = await approvedDecision(t.store);
+    expect((await t.executor.enqueue(d.id))?.status).toBe('EXECUTED');
+    // Old behaviour re-read the pending nonce (6) and sent a SECOND transaction → double execution.
+    expect(t.st.writes.map((w) => w.nonce)).toEqual([5, 5]);
+    expect(t.st.nonceReads).toBe(1);
+  });
+
+  it('network error, then the node reports the nonce as used → abandoned (FAILED), never re-sent with a new nonce', async () => {
+    const t = executorSetup();
+    t.st.write = () => {
+      if (t.st.writes.length === 1) {
+        t.st.nodeNonce = 6; // first attempt was mined although its response was lost
+        throw new Error('fetch failed');
+      }
+      throw new NonceTooLowError();
+    };
+    const d = await approvedDecision(t.store);
+    expect((await t.executor.enqueue(d.id))?.status).toBe('FAILED');
+    expect(t.st.writes.map((w) => w.nonce)).toEqual([5, 5]);
+    const [action] = await t.store.listActions(d.id);
+    expect(action).toMatchObject({ status: 'FAILED', decodedError: { name: 'SEND_FAILED', args: { message: expect.stringContaining('not re-sent') } } });
+    // The next send resyncs from the node (no nonce gap, no reuse of the abandoned one).
+    t.st.write = (req) => hashOf(req.nonce + 1);
+    t.st.logs = [breakerLog()];
+    const d2 = await approvedDecision(t.store);
+    expect((await t.executor.enqueue(d2.id))?.status).toBe('EXECUTED');
+    expect(t.st.writes.at(-1)!.nonce).toBe(6);
+  });
+
+  it('isNonceConsumed recognises node replies for an already-used nonce', () => {
+    expect(isNonceConsumed(new NonceTooLowError())).toBe(true);
+    expect(isNonceConsumed(new Error('already known'))).toBe(true);
+    expect(isNonceConsumed(new Error('replacement transaction underpriced'))).toBe(true);
+    expect(isNonceConsumed(new Error('fetch failed'))).toBe(false);
+  });
+
+  it('enqueue never rejects even when the failure cannot be recorded (fire-and-forget callers would crash Node)', async () => {
+    const t = executorSetup();
+    const d = await approvedDecision(t.store);
+    const logged: string[] = [];
+    const store = Object.assign(Object.create(t.store) as MemoryAgentStore, {
+      transitionDecision: async () => {
+        throw new Error('database is locked');
+      },
+    });
+    const executor = new Executor({
+      client: t.client,
+      wallet: t.wallet,
+      addresses: ADDRS,
+      store,
+      audit: new AuditLogger(t.sink),
+      retryDelaysMs: NO_DELAY,
+      readSnapshot: async () => snapshot(),
+      log: { info: () => undefined, warn: () => undefined, error: (m) => void logged.push(m) },
+    });
+    await expect(executor.enqueue(d.id)).resolves.toBeNull();
+    expect(logged).toEqual(['executor crashed', 'executor could not record the failure']);
+  });
+
+  it('errorMessage (audit rows, KeeperRun errors — both public) strips RPC URLs carrying API keys', () => {
+    const msg = errorMessage(new Error('HTTP request failed.\nURL: https://avalanche-fuji.example.io/v2/SECRETKEY123?x=1'));
+    expect(msg).not.toContain('SECRETKEY123');
+    expect(msg).toContain('https://avalanche-fuji.example.io/…');
   });
 });

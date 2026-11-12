@@ -1,8 +1,8 @@
 // Background loops (docs/14 §1 scheduler.ts): agent tick (docs/05 §2), keeper (docs/05 §10.1), event indexer
 // (docs/07 §6). `/agent/evaluate` and scheduled ticks share one mutex (docs/07 §7): one tick at a time.
 import type { Address } from 'viem';
-import type { AgentLoop, Keeper, KeeperRunResult, Logger, TickResult } from '@runwaymind/agent';
-import { silentLogger } from '@runwaymind/agent';
+import type { AgentLoop, AgentStore, AuditLogger, Keeper, KeeperRunResult, Logger, TickResult } from '@runwaymind/agent';
+import { redactUrls, silentLogger } from '@runwaymind/agent';
 import type { AgentSettings } from '@runwaymind/shared';
 
 /** Serializes async work (one tick at a time). */
@@ -39,6 +39,8 @@ export interface SchedulerDeps {
   getSettings(): Promise<AgentSettings>;
   /** APPROVED decisions left over from a previous process (re-enqueued on start). */
   approvedDecisionIds?: () => Promise<string[]>;
+  /** Marks EXECUTING decisions left over from a previous process as FAILED (see failInterruptedExecutions). */
+  recoverInterrupted?: (before: Date) => Promise<unknown>;
   getBalance?: (address: Address) => Promise<bigint>;
   keeperIntervalMs?: number;
   indexerIntervalMs?: number;
@@ -59,9 +61,31 @@ export interface KeeperStatusView {
 export const DEFAULT_KEEPER_INTERVAL_MS = 10_000;
 export const DEFAULT_INDEXER_INTERVAL_MS = 10_000; // docs/07 §6: poll every 10 s
 
+/**
+ * A decision is EXECUTING only while this process's executor runs it. One still EXECUTING from before this process
+ * started was interrupted (crash / restart): its transaction may or may not have been sent, so it is never re-run.
+ * It is marked FAILED (ACTION_FAILED, reason INTERRUPTED) so the slot is no longer IN_FLIGHT; the next tick re-decides
+ * from chain state, and the event indexer records the transaction if it was mined.
+ */
+export async function failInterruptedExecutions(
+  store: Pick<AgentStore, 'listOpenDecisions' | 'transitionDecision'>,
+  audit: AuditLogger,
+  before: Date,
+): Promise<string[]> {
+  const stuck = (await store.listOpenDecisions()).filter((d) => d.status === 'EXECUTING' && d.updatedAt.getTime() < before.getTime());
+  const failed: string[] = [];
+  for (const d of stuck) {
+    if (!(await store.transitionDecision(d.id, ['EXECUTING'], { status: 'FAILED' }))) continue;
+    failed.push(d.id);
+    await audit.record('ACTION_FAILED', { reason: 'INTERRUPTED', stage: 'EXECUTOR' }, { entityType: 'DECISION', entityId: d.id });
+  }
+  return failed;
+}
+
 export function createScheduler(deps: SchedulerDeps) {
   const log = deps.log ?? silentLogger;
   const now = deps.now ?? (() => new Date());
+  const createdAt = now(); // executions this process starts are all EXECUTING at or after this instant
   const tickMutex = new Mutex();
   const keeperMutex = new Mutex();
   const timers = new Set<ReturnType<typeof setTimeout>>();
@@ -100,7 +124,8 @@ export function createScheduler(deps: SchedulerDeps) {
         Object.assign(keeperState, { lastRunAt: result.finishedAt, lastResult: result, lastError: result.errors.length ? JSON.stringify(result.errors[0]) : null });
         return result;
       } catch (e) {
-        Object.assign(keeperState, { lastRunAt: now(), lastError: (e as Error).message });
+        // Served by the public GET /keeper/status: strip RPC URLs (API keys) from viem messages (rule 7).
+        Object.assign(keeperState, { lastRunAt: now(), lastError: redactUrls((e as Error).message) });
         throw e;
       }
     });
@@ -111,6 +136,7 @@ export function createScheduler(deps: SchedulerDeps) {
     const arm = async () => {
       if (!running) return;
       const ms = await Promise.resolve(delayMs()).catch(() => 30_000);
+      if (!running) return; // stop() ran while the delay was being read: never arm a timer it cannot clear
       onArm?.(new Date(now().getTime() + ms));
       const t = setTimeout(async () => {
         timers.delete(t);
@@ -161,6 +187,9 @@ export function createScheduler(deps: SchedulerDeps) {
     async start() {
       if (running) return;
       running = true;
+      if (deps.recoverInterrupted) {
+        await deps.recoverInterrupted(createdAt).catch((e: Error) => log.error('interrupted-execution recovery failed', { error: e.message }));
+      }
       if (deps.executor && deps.approvedDecisionIds) {
         for (const id of await deps.approvedDecisionIds()) void deps.executor.enqueue(id);
       }

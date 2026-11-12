@@ -2,6 +2,7 @@
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import { toJsonSafe, type ApiFailure, type ApiMeta } from '@runwaymind/shared';
+import { redactUrls } from '@runwaymind/agent';
 import { ApiError } from '../errors';
 
 export interface ChainMeta {
@@ -44,7 +45,9 @@ export function registerErrorHandling(app: FastifyInstance): void {
       body = { success: false, data: null, error: { code: 'RATE_LIMITED', message: 'Too many requests' }, meta };
       return reply.status(429).send(body);
     }
-    request.log.error({ err: error }, 'unhandled error');
+    // Logged without the raw error object: viem messages/stacks embed RPC URLs with API keys (rule 7).
+    const err = error as Error;
+    request.log.error({ err: { type: err.name, message: redactUrls(err.message ?? ''), stack: redactUrls(err.stack ?? '') } }, 'unhandled error');
     body = { success: false, data: null, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' }, meta };
     return reply.status(500).send(body);
   });

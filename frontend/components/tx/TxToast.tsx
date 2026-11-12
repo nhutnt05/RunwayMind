@@ -12,7 +12,8 @@ export function TxToast({ item, onDismiss }: { item: TxToastItem; onDismiss: () 
   const failed = item.status === 'REVERTED' || item.status === 'FAILED';
   return (
     <div
-      role={failed ? 'alert' : 'status'}
+      // Pending / confirmed updates are announced politely by the viewport's live region; failures interrupt.
+      role={failed ? 'alert' : undefined}
       className={`pointer-events-auto w-full rounded-lg border bg-white p-3 text-sm shadow-lg ${
         failed ? 'border-red-300' : item.status === 'CONFIRMED' ? 'border-emerald-300' : 'border-slate-200'
       }`}
@@ -58,7 +59,8 @@ export function TxToastViewport() {
     return () => timers.forEach(clearTimeout);
   }, [items, dismiss]);
 
-  if (items.length === 0) return null;
+  // The live region is always mounted (even when empty) so screen readers announce the first pending toast; a live
+  // region inserted together with its content is often not announced.
   return (
     <div
       aria-live="polite"

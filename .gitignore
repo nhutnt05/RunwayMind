@@ -36,8 +36,13 @@ docs/*
 frontend/.next-e2e/
 frontend/.next-a11y/
 frontend/e2e/.state/
+frontend/\.next-perf/
+frontend/e2e
 frontend/test-results/
 frontend/test/
 frontend/playwright-report/
 backend/prisma/e2e.db*
 .gas-snapshot
+
+backend/test/
+agent/test/

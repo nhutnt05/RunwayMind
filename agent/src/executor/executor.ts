@@ -84,7 +84,10 @@ export class Executor {
     return this.deps.wallet.account.address;
   }
 
-  /** Queues an APPROVED decision; resolves with the final record once it has been processed. */
+  /**
+   * Queues an APPROVED decision; resolves with the final record once it has been processed. Never rejects: callers
+   * fire-and-forget (`void enqueue(id)`), and an unhandled rejection would terminate the Node process.
+   */
   enqueue(decisionId: string): Promise<DecisionRecord | null> {
     return this.queue.run(async () => {
       try {
@@ -93,13 +96,19 @@ export class Executor {
         return d;
       } catch (e) {
         this.log.error('executor crashed', { decisionId, error: errorMessage(e) });
-        const d = await this.deps.store.transitionDecision(decisionId, ['EXECUTING', 'APPROVED'], { status: 'FAILED' });
-        await this.deps.audit.record('ACTION_FAILED', { reason: 'EXECUTOR_ERROR', message: errorMessage(e) }, {
-          entityType: 'DECISION',
-          entityId: decisionId,
-        });
-        if (d) this.deps.onSettled?.(d);
-        return d;
+        try {
+          const d = await this.deps.store.transitionDecision(decisionId, ['EXECUTING', 'APPROVED'], { status: 'FAILED' });
+          await this.deps.audit.record('ACTION_FAILED', { reason: 'EXECUTOR_ERROR', message: errorMessage(e) }, {
+            entityType: 'DECISION',
+            entityId: decisionId,
+          });
+          if (d) this.deps.onSettled?.(d);
+          return d;
+        } catch (e2) {
+          // e.g. the database is down too: the decision stays EXECUTING and is recovered on the next start.
+          this.log.error('executor could not record the failure', { decisionId, error: errorMessage(e2) });
+          return null;
+        }
       }
     });
   }

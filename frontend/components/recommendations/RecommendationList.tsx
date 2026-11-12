@@ -13,18 +13,22 @@ import { RecommendationCard } from './RecommendationCard';
 type Busy = { id: string; kind: 'approve' | 'reject' } | null;
 
 /** Dashboard list of agent recommendations (docs/08 §2) — `/recommendations?status=PENDING_APPROVAL`. */
-/** Wall-clock seconds, ticking every second (approval TTLs are wall-clock, see RecommendationCard). */
-function useWallClockSec(): number {
+/**
+ * Wall-clock seconds, ticking every second (approval TTLs are wall-clock, see RecommendationCard). The tick only runs
+ * while a card is on screen: with an empty list it would re-render the whole list every second for nothing.
+ */
+function useWallClockSec(active: boolean): number {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
+    if (!active) return;
+    setNow(Math.floor(Date.now() / 1000));
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [active]);
   return now;
 }
 
 export function RecommendationList() {
-  const nowSec = useWallClockSec();
   const pending = usePendingRecommendations();
   const { approve, reject } = useDecideRecommendation();
   const gate = useAdminGate();
@@ -34,6 +38,7 @@ export function RecommendationList() {
   const [tracked, setTracked] = useState<string[]>([]);
   const [busy, setBusy] = useState<Busy>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const nowSec = useWallClockSec(tracked.length > 0 || (pending.data?.data.length ?? 0) > 0);
 
   function handle(kind: 'approve' | 'reject', id: string) {
     setBusy({ id, kind });

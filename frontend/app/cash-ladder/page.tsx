@@ -41,6 +41,9 @@ export default function CashLadderPage() {
 
       {ladder.isError && !l ? (
         <ErrorState title="Could not compute the Cash Ladder" message={(ladder.error as Error).message} onRetry={() => void ladder.refetch()} />
+      ) : overview.isError && !o ? (
+        // The ladder needs the policy (horizon, buffer) from the overview: without it the page would stay on skeletons.
+        <ErrorState title="Could not load the treasury policy" message={(overview.error as Error).message} onRetry={() => void overview.refetch()} />
       ) : !l || !o ? (
         <div className="space-y-4">
           <SkeletonCard label="ladder summary" lines={2} />

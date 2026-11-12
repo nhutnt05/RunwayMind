@@ -3,7 +3,7 @@
 import type { Transaction } from '@prisma/client';
 import type { Hex } from 'viem';
 import { decodeTrackedLogs, kindFromEvents, type DecodedEvent } from '@runwaymind/agent';
-import { snowtraceTxUrl, type TransactionKind } from '@runwaymind/shared';
+import { obligationMetadataHash, snowtraceTxUrl, type Category, type ObligationSource, type TransactionKind } from '@runwaymind/shared';
 import { notFound } from '../errors';
 import type { Repositories } from '../repositories';
 import type { ChainService, ReceiptView } from './chain';
@@ -50,6 +50,18 @@ export function createTransactionService(chain: ChainService, repos: Repositorie
     const created = events.find((e) => e.name === 'ObligationCreated');
     const draft = await repos.getDraft(draftId);
     if (!created || !draft) return;
+    // Any session may register any tx hash: only link a draft whose content is what the tx committed on-chain, so a
+    // caller cannot relabel an existing obligation by pairing its creation tx with an unrelated draft id.
+    const expected = obligationMetadataHash({
+      label: draft.label,
+      notes: draft.notes ?? null,
+      category: draft.category as Category,
+      source: draft.source as ObligationSource,
+    });
+    if (String(created.args.metadataHash).toLowerCase() !== expected.toLowerCase()) {
+      opts.log?.error('draft does not match the on-chain metadataHash; not linked', { draftId, txHash });
+      return;
+    }
     await repos.upsertMetadata({
       obligationId: String(created.args.id),
       label: draft.label,

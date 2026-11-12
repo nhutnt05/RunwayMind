@@ -32,9 +32,12 @@ export default function DashboardPage() {
   const chainTime = chain.data ? Number(chain.data.currentTime) : (o?.chainTime ?? 0);
   const demoStartTime = o?.demoStartTime ?? null;
   const loading = overview.isLoading && !o;
-  // While loading show a skeleton; once the API has failed with nothing cached show "—" (the ErrorState explains why).
-  const pending = (node: ReactNode) => (overview.isError && !o && !chain.data ? '—' : node);
-  const valueSkeleton = pending(<Skeleton className="mt-2 h-7 w-32" />);
+  // While loading show a skeleton; once the source has failed with nothing cached show "—" (the ErrorState explains
+  // why). Chain-backed cards (total, idle) can still fill from the RPC; API-only cards (vault) cannot.
+  const apiFailed = overview.isError && !o;
+  const skeleton: ReactNode = <Skeleton className="mt-2 h-7 w-32" />;
+  const valueSkeleton = apiFailed && !chain.data ? '—' : skeleton;
+  const apiValueSkeleton = apiFailed ? '—' : skeleton;
 
   return (
     <>
@@ -82,7 +85,7 @@ export default function DashboardPage() {
           />
         </div>
         <div className="lg:col-span-3">
-          <StatCard title="In Yield Vault" value={o ? <AmountText value={o.vaultTotal} /> : valueSkeleton} />
+          <StatCard title="In Yield Vault" value={o ? <AmountText value={o.vaultTotal} /> : apiValueSkeleton} />
         </div>
         <div className="lg:col-span-3">
           <StatCard

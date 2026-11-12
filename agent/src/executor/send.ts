@@ -12,6 +12,7 @@ import {
   type Transport,
   type WalletClient,
 } from 'viem';
+import { redactUrls } from '../audit/audit';
 import { decodeContractError, type DecodedError } from '../chain/errors';
 import type { NonceQueue } from './nonceQueue';
 
@@ -69,9 +70,10 @@ export type SimulationOutcome =
   | { ok: false; reverted: true; error: DecodedError | null; message: string }
   | { ok: false; reverted: false; error: null; message: string };
 
+/** Error text for audit rows / KeeperRun errors (served publicly): RPC URLs (API keys) are redacted (rule 7). */
 export function errorMessage(e: unknown): string {
-  if (e instanceof BaseError) return e.shortMessage || e.message;
-  return e instanceof Error ? e.message : String(e);
+  if (e instanceof BaseError) return redactUrls(e.shortMessage || e.message);
+  return redactUrls(e instanceof Error ? e.message : String(e));
 }
 
 /** `simulateContract` from `account`; network failures are retried, reverts are decoded. */
@@ -100,6 +102,25 @@ export class SendRevertedError extends Error {
   }
 }
 
+/**
+ * An earlier attempt may already be in the mempool / mined (its response was lost), and the node now reports the
+ * nonce as used. Re-sending with a fresh nonce could execute the call twice, so the send is abandoned instead; the
+ * event indexer records the transaction if it was mined.
+ */
+export class SendAmbiguousError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SendAmbiguousError';
+  }
+}
+
+/** The node already has a transaction at this nonce (ours from a lost response, or another sender's). */
+export function isNonceConsumed(e: unknown): boolean {
+  if (e instanceof BaseError && e.walk((x) => (x as Error).name === 'NonceTooLowError') !== null) return true;
+  const text = e instanceof BaseError ? `${e.shortMessage} ${e.details ?? ''}` : e instanceof Error ? e.message : String(e);
+  return /nonce too low|already known|replacement transaction underpriced|nonce has already been used/i.test(text);
+}
+
 export interface SendOptions {
   client: PublicClient;
   wallet: AgentWallet;
@@ -118,21 +139,37 @@ export interface SendOptions {
 export async function sendAndConfirm(o: SendOptions): Promise<{ hash: Hex; receipt: TransactionReceipt; attempts: number }> {
   const delays = o.delays ?? DEFAULT_RETRY_DELAYS_MS;
   let attempts = 0;
-  const hash = await withRetry(
-    async (attempt) => {
-      attempts = attempt;
-      const nonce = await o.queue.next();
-      try {
-        return await o.wallet.writeContract({ ...o.call, nonce } as never);
-      } catch (e) {
-        o.queue.reset(); // unsent nonce (or nonce too low / too high) → resync from node
-        if (isRevertError(e)) throw new SendRevertedError(decodeContractError(e), errorMessage(e));
-        throw e;
-      }
-    },
-    delays,
-    (e) => !(e instanceof SendRevertedError),
-  );
+  // Network / timeout failures are retried with the SAME nonce: the request may have reached the node even though
+  // the response was lost, and one nonce can be mined at most once — so a retry can never execute the call twice.
+  let nonce: number | null = null;
+  let maybeSent = false;
+  let hash: Hex;
+  try {
+    hash = await withRetry(
+      async (attempt) => {
+        attempts = attempt;
+        nonce ??= await o.queue.next();
+        try {
+          return await o.wallet.writeContract({ ...o.call, nonce } as never);
+        } catch (e) {
+          if (isRevertError(e)) throw new SendRevertedError(decodeContractError(e), errorMessage(e));
+          if (isNonceConsumed(e)) {
+            if (maybeSent) throw new SendAmbiguousError(`nonce ${nonce} already used after a lost send response; not re-sent: ${errorMessage(e)}`);
+            o.queue.reset(); // another sender took this nonce → resync from the node and send with the next one
+            nonce = null;
+          } else {
+            maybeSent = true;
+          }
+          throw e;
+        }
+      },
+      delays,
+      (e) => !(e instanceof SendRevertedError) && !(e instanceof SendAmbiguousError),
+    );
+  } catch (e) {
+    o.queue.reset(); // the reserved nonce was not (knowingly) used → resync from the node for the next send
+    throw e;
+  }
   await o.onSent?.(hash, attempts);
   const receipt = await withRetry(
     () => o.client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: o.receiptTimeoutMs ?? DEFAULT_RECEIPT_TIMEOUT_MS }),

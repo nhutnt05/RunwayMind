@@ -77,7 +77,11 @@ function InflowManager({ demoStartTime }: { demoStartTime: number | null }) {
     },
     onError: (e) => setError((e as Error).message),
   });
-  const del = useMutation({ mutationFn: (id: string) => api.delete(`/inflows/${id}`), onSuccess: invalidate });
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/inflows/${id}`),
+    onSuccess: invalidate,
+    onError: (e) => setError((e as Error).message),
+  });
   const items = inflows.data?.data ?? [];
   return (
     <section aria-label="Expected inflows" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -172,7 +176,7 @@ export default function StressTestPage() {
         ) : null}
       </div>
 
-      {latest.isError ? (
+      {latest.isError && latest.data === undefined ? (
         <ErrorState title="Could not load stress tests" message={(latest.error as Error).message} onRetry={() => void latest.refetch()} />
       ) : latest.isLoading ? (
         <SkeletonGrid label="stress test results" count={5} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5" />
