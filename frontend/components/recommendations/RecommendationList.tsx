@@ -13,7 +13,18 @@ import { RecommendationCard } from './RecommendationCard';
 type Busy = { id: string; kind: 'approve' | 'reject' } | null;
 
 /** Dashboard list of agent recommendations (docs/08 §2) — `/recommendations?status=PENDING_APPROVAL`. */
-export function RecommendationList({ chainTime }: { chainTime: number }) {
+/** Wall-clock seconds, ticking every second (approval TTLs are wall-clock, see RecommendationCard). */
+function useWallClockSec(): number {
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+export function RecommendationList() {
+  const nowSec = useWallClockSec();
   const pending = usePendingRecommendations();
   const { approve, reject } = useDecideRecommendation();
   const gate = useAdminGate();
@@ -54,7 +65,7 @@ export function RecommendationList({ chainTime }: { chainTime: number }) {
       <h3 className="text-sm font-medium text-slate-600">Agent recommendations</h3>
       <div className="mt-3 space-y-3">
         {tracked.map((id) => (
-          <TrackedRecommendation key={id} id={id} chainTime={chainTime} gate={gate} />
+          <TrackedRecommendation key={id} id={id} nowSec={nowSec} gate={gate} />
         ))}
         {pending.isLoading ? (
           <Skeleton className="h-28 w-full" />
@@ -71,7 +82,7 @@ export function RecommendationList({ chainTime }: { chainTime: number }) {
             <RecommendationCard
               key={d.id}
               decision={d}
-              chainTime={chainTime}
+              nowSec={nowSec}
               gate={gate}
               busy={busy?.id === d.id ? busy.kind : null}
               error={errors[d.id] ?? null}
@@ -86,11 +97,11 @@ export function RecommendationList({ chainTime }: { chainTime: number }) {
 }
 
 /** A decision acted on in this session: polls `/recommendations/:id` and mirrors its progress into a TxToast. */
-function TrackedRecommendation({ id, chainTime, gate }: { id: string; chainTime: number; gate: AdminGate }) {
+function TrackedRecommendation({ id, nowSec, gate }: { id: string; nowSec: number; gate: AdminGate }) {
   const { data } = useRecommendation(id);
   useDecisionToast(data);
   if (!data) return <Skeleton className="h-28 w-full" />;
-  return <RecommendationCard decision={data} chainTime={chainTime} gate={gate} />;
+  return <RecommendationCard decision={data} nowSec={nowSec} gate={gate} />;
 }
 
 function useDecisionToast(decision: AgentDecisionJson | undefined) {

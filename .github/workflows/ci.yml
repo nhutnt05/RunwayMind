@@ -40,6 +40,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @runwaymind/backend run prisma:generate
       - run: pnpm -r lint
       - run: pnpm -r typecheck
       - run: pnpm -r test
@@ -56,4 +57,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # e2e (Anvil + Playwright, docs/10 §8) is added with the Playwright suite in D6.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    # docs/10 §6, §8: Anvil + Deploy/SeedDemo fixture + backend + frontend (NEXT_PUBLIC_E2E mock connector) + Playwright.
+    # frontend/e2e/stack.ts starts and stops everything on ports 8547 / 4100 / 3100.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: forge build
+      - run: pnpm --filter @runwaymind/backend run prisma:generate
+      - run: pnpm --filter @runwaymind/frontend exec playwright install --with-deps chromium
+      - run: pnpm --filter @runwaymind/frontend run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-logs
+          path: |
+            frontend/e2e/.state/*.log
+            frontend/test-results/

@@ -38,3 +38,27 @@ describe('loadDeployment', () => {
     expect(() => loadDeployment({ ...fuji, contracts })).toThrow(/Treasury/);
   });
 });
+
+describe('deploymentForChain with a secondary treasury on the same chain (D6-A1)', () => {
+  it('prefers the primary file (fuji) over fuji-usdc regardless of map order', async () => {
+    const { deploymentForChain } = await import('../src/deployments');
+    const dep = (treasury: string) => ({
+      chainId: 43113,
+      deployBlock: '1',
+      demoMode: true,
+      demoStartTime: 1,
+      contracts: {
+        ObligationRegistry: '0x0000000000000000000000000000000000000002',
+        PolicyEngine: '0x0000000000000000000000000000000000000003',
+        Treasury: treasury,
+        MockLendingPool: '0x0000000000000000000000000000000000000004',
+        VaultAdapter: '0x0000000000000000000000000000000000000005',
+      },
+      roles: { admin: '0x0000000000000000000000000000000000000006', agent: '0x0000000000000000000000000000000000000007' },
+    });
+    const usdc = dep('0x00000000000000000000000000000000000000Aa');
+    const primary = dep('0x00000000000000000000000000000000000000bB');
+    expect(deploymentForChain({ 'fuji-usdc': usdc, fuji: primary }, 43113)?.contracts.Treasury.toLowerCase()).toBe('0x00000000000000000000000000000000000000bb');
+    expect(deploymentForChain({ 'fuji-usdc': usdc }, 43113)?.contracts.Treasury.toLowerCase()).toBe('0x00000000000000000000000000000000000000aa');
+  });
+});

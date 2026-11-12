@@ -13,7 +13,8 @@
     "sync-abi": "pnpm --filter @runwaymind/shared run sync-abi",
     "dev": "pnpm --parallel --filter @runwaymind/backend --filter @runwaymind/frontend dev",
     "demo:reset": "tsx scripts/demo/reset.ts",
-    "demo:attack": "tsx scripts/demo/attack.ts"
+    "demo:attack": "tsx scripts/demo/attack.ts",
+    "demo:usdc-smoke": "tsx scripts/demo/usdcSmoke.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

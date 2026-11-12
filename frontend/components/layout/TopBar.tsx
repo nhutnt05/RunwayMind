@@ -6,6 +6,7 @@ import { appChain } from '@/lib/chains';
 import { CircuitBreakerBadge } from './CircuitBreakerBadge';
 import { DemoModeBadge } from './DemoModeBadge';
 import { SignInButton } from './SignInButton';
+import { TreasurySwitcher } from './TreasurySwitcher';
 
 export function TopBar() {
   return (
@@ -21,6 +22,7 @@ export function TopBar() {
           {appChain.name}
         </span>
         <div className="ml-auto flex items-center gap-2">
+          <TreasurySwitcher />
           <DemoModeBadge />
           <CircuitBreakerBadge />
           <SignInButton />

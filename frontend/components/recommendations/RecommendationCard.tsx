@@ -5,8 +5,11 @@ import { decisionHeadline, expiryLabel, isActionable, latestAction, type AdminGa
 
 export interface RecommendationCardProps {
   decision: AgentDecisionJson;
-  /** Treasury.currentTime() — expiry countdown uses chain time (docs/07 §2.2). */
-  chainTime: number;
+  /**
+   * Wall-clock Unix seconds. Approval TTLs (`expiresAt`) are operational wall-clock times set and enforced by the
+   * backend (agent/src/orchestrator/approval.ts) — NOT chain time, which jumps ahead with demo time travel (CP2 B-12).
+   */
+  nowSec: number;
   gate: AdminGate;
   busy?: 'approve' | 'reject' | null;
   error?: string | null;
@@ -18,11 +21,11 @@ export interface RecommendationCardProps {
  * Agent recommendation (docs/08 §2): headline, explanation, reasons, amount, expiry countdown and ADMIN-only
  * Approve / Reject. A policy-blocked decision turns red with the decoded rule (docs/08 §8).
  */
-export function RecommendationCard({ decision, chainTime, gate, busy = null, error, onApprove, onReject }: RecommendationCardProps) {
+export function RecommendationCard({ decision, nowSec, gate, busy = null, error, onApprove, onReject }: RecommendationCardProps) {
   const ex = decision.explanation;
   const blocked = decision.status === 'BLOCKED_BY_POLICY';
   const action = latestAction(decision);
-  const actionable = isActionable(decision, chainTime);
+  const actionable = isActionable(decision, nowSec);
   const disabled = !gate.enabled || busy !== null;
   const title = gate.reason ?? undefined;
   const headingId = `rec-${decision.id}-title`;
@@ -44,7 +47,7 @@ export function RecommendationCard({ decision, chainTime, gate, busy = null, err
         {decision.amount ? <AmountText value={decision.amount} className="text-sm font-semibold text-slate-900" /> : null}
         {decision.adapter ? <AddressChip address={decision.adapter} /> : null}
         <span>{decision.reasonCode.replace(/_/g, ' ')}</span>
-        {decision.status === 'PENDING_APPROVAL' ? <span>{expiryLabel(decision.expiresAt, chainTime)}</span> : null}
+        {decision.status === 'PENDING_APPROVAL' ? <span>{expiryLabel(decision.expiresAt, nowSec)}</span> : null}
         {ex ? (
           <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">
             {ex.source === 'LLM' ? 'AI explanation' : 'Template'}

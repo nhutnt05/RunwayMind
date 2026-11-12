@@ -22,6 +22,7 @@ import type {
   WithdrawalScheduleItem,
 } from '@runwaymind/shared';
 import { publicEnv } from './env';
+import { getSelectedTreasuryId, withTreasuryParam } from './treasurySelection';
 
 export class ApiError extends Error {
   constructor(
@@ -55,7 +56,8 @@ export function createApiClient(baseUrl: string = publicEnv.apiBaseUrl, fetchImp
   async function request<T>(method: string, path: string, body?: unknown): Promise<ApiResult<T>> {
     let res: Response;
     try {
-      res = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${path}`, {
+      // D6 multi-treasury: every request targets the selected treasury (backend default = primary).
+      res = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${withTreasuryParam(path, getSelectedTreasuryId())}`, {
         method,
         credentials: 'include', // rm_session cookie (SIWE)
         headers: body === undefined ? undefined : { 'content-type': 'application/json' },

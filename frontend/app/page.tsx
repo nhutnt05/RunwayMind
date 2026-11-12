@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
         {/* Row 3 — recommendations (7) + upcoming obligations (5) */}
         <div className="md:col-span-2 lg:col-span-7">
-          <RecommendationList chainTime={chainTime} />
+          <RecommendationList />
         </div>
         <div className="md:col-span-2 lg:col-span-5">
           {obligations.data ? (

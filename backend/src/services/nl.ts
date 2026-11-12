@@ -36,10 +36,12 @@ export interface NlServiceDeps {
   audit: AuditLogger;
   llm: { provider: LlmProvider | null; timeoutMs: number };
   now?: () => number;
+  /** Shared limiter (one per API process, across treasuries); a private one is created when omitted. */
+  limiter?: ReturnType<typeof createRateLimiter>;
 }
 
-export function createNlService({ chain, repos, audit, llm, now }: NlServiceDeps) {
-  const limiter = createRateLimiter(NL_RATE_LIMIT.max, NL_RATE_LIMIT.windowMs, now);
+export function createNlService({ chain, repos, audit, llm, now, limiter: shared }: NlServiceDeps) {
+  const limiter = shared ?? createRateLimiter(NL_RATE_LIMIT.max, NL_RATE_LIMIT.windowMs, now);
 
   return {
     async parse(body: ParseObligationsRequest, by: Address) {

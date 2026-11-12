@@ -1,0 +1,18 @@
+{
+  "chainId": 43113,
+  "contracts": {
+    "MockLendingPool": "0x68d62FC0ed6C334B64B11b242580846c7a5894CF",
+    "MockUSDC": "0x2ef65B3767c1b18eCd3647d02ee1a8bBd2B6D01e",
+    "ObligationRegistry": "0x837b79bc6f00729287D6cb5F267c291B73473175",
+    "PolicyEngine": "0xc4b05a6c0528af3a6dB59912Fa5C6AA5342937d1",
+    "Treasury": "0xDBb9Ddc80FCBeacCB6588aFB04eBefb7d6795B9f",
+    "VaultAdapter": "0xE1729AD0752E8B32F9f38D4e7907573bFef5d520"
+  },
+  "demoMode": true,
+  "demoStartTime": 1794382804,
+  "deployBlock": "60880334",
+  "roles": {
+    "admin": "0xaC9309a1C6C150D98111AfffF851D07AD650CB5E",
+    "agent": "0x901999461cB4ecF9d971458A6aaf4bFbEbbB0051"
+  }
+}

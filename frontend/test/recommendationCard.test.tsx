@@ -61,7 +61,7 @@ describe('adminGate (docs/08 §8)', () => {
 
 describe('RecommendationCard role gating', () => {
   it('renders headline, explanation, reasons, amount and expiry', () => {
-    const html = renderToStaticMarkup(<RecommendationCard decision={decision()} chainTime={T} gate={ADMIN} />);
+    const html = renderToStaticMarkup(<RecommendationCard decision={decision()} nowSec={T} gate={ADMIN} />);
     expect(html).toContain('Invest 70000.00 USDC into Mock Lending Pool');
     expect(html).toContain('Idle exceeds the required reserve.');
     expect(html).toContain('APY 8.00%');
@@ -71,14 +71,14 @@ describe('RecommendationCard role gating', () => {
   });
 
   it('ADMIN: Approve and Reject are enabled', () => {
-    const html = renderToStaticMarkup(<RecommendationCard decision={decision()} chainTime={T} gate={ADMIN} />);
+    const html = renderToStaticMarkup(<RecommendationCard decision={decision()} nowSec={T} gate={ADMIN} />);
     const b = buttons(html).filter((x) => x.label === 'Approve' || x.label === 'Reject');
     expect(b).toHaveLength(2);
     for (const x of b) expect(x.tag).not.toMatch(/disabled=""/);
   });
 
   it('non-ADMIN: buttons are disabled with tooltip "Requires ADMIN role"', () => {
-    const html = renderToStaticMarkup(<RecommendationCard decision={decision()} chainTime={T} gate={VIEWER} />);
+    const html = renderToStaticMarkup(<RecommendationCard decision={decision()} nowSec={T} gate={VIEWER} />);
     const b = buttons(html).filter((x) => x.label === 'Approve' || x.label === 'Reject');
     expect(b).toHaveLength(2);
     for (const x of b) {
@@ -89,14 +89,14 @@ describe('RecommendationCard role gating', () => {
 
   it('busy state disables buttons even for ADMIN', () => {
     const html = renderToStaticMarkup(
-      <RecommendationCard decision={decision()} chainTime={T} gate={ADMIN} busy="approve" />,
+      <RecommendationCard decision={decision()} nowSec={T} gate={ADMIN} busy="approve" />,
     );
     expect(buttons(html).find((x) => x.label === 'Approving…')?.tag).toMatch(/disabled=""/);
   });
 
   it('no Approve/Reject once expired or no longer pending', () => {
     for (const d of [decision({ expiresAt: T }), decision({ status: 'APPROVED' }), decision({ status: 'EXECUTED' })]) {
-      const html = renderToStaticMarkup(<RecommendationCard decision={d} chainTime={T} gate={ADMIN} />);
+      const html = renderToStaticMarkup(<RecommendationCard decision={d} nowSec={T} gate={ADMIN} />);
       expect(buttons(html).some((x) => x.label === 'Approve')).toBe(false);
     }
   });
@@ -108,7 +108,7 @@ describe('RecommendationCard role gating', () => {
           status: 'EXECUTED',
           actions: [{ id: 'a1', functionName: 'invest', status: 'CONFIRMED', txHash: HASH, decodedError: null }],
         })}
-        chainTime={T}
+        nowSec={T}
         gate={ADMIN}
       />,
     );
@@ -128,7 +128,7 @@ describe('RecommendationCard role gating', () => {
             },
           ],
         })}
-        chainTime={T}
+        nowSec={T}
         gate={ADMIN}
       />,
     );
@@ -146,7 +146,7 @@ describe('recommendation helpers', () => {
     expect(isTerminalDecision('EXECUTING')).toBe(false);
   });
 
-  it('expiryLabel / isActionable use chain time', () => {
+  it('expiryLabel / isActionable use the given wall-clock now', () => {
     expect(expiryLabel(T + 3725, T)).toBe('expires in 1h 02m');
     expect(expiryLabel(T + 45, T)).toBe('expires in 45s');
     expect(expiryLabel(T, T)).toBe('expired');
@@ -167,5 +167,19 @@ describe('recommendation helpers', () => {
     expect(decisionTxStatus('EXECUTED')).toBe('CONFIRMED');
     expect(decisionTxStatus('BLOCKED_BY_POLICY')).toBe('REVERTED');
     expect(decisionTxStatus('EXECUTING')).toBe('PENDING');
+  });
+});
+
+describe('approval expiry is wall-clock, not chain time (CP2 B-12)', () => {
+  it('a fresh card stays actionable when demo time travel moved chain time 3 days ahead', () => {
+    // expiresAt = wall clock + 10 min (backend TTL). Chain time is irrelevant to it.
+    const wallNow = T;
+    const d = decision();
+    const chainTimeAfterTravel = wallNow + 3 * 86_400;
+    expect(isActionable(d, chainTimeAfterTravel)).toBe(false); // the old bug: comparing with chain time
+    expect(isActionable(d, wallNow)).toBe(true); // the fix: the card passes wall-clock nowSec
+    const html = renderToStaticMarkup(<RecommendationCard decision={d} nowSec={wallNow} gate={ADMIN} />);
+    expect(html).toContain('Approve');
+    expect(html).not.toContain('>expired<');
   });
 });

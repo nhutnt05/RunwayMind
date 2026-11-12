@@ -8,4 +8,6 @@ export const publicEnv = {
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1',
   walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? '',
   snowtraceBase: process.env.NEXT_PUBLIC_SNOWTRACE_BASE ?? 'https://testnet.snowtrace.io',
+  /** Playwright E2E only (docs/10 §6): wagmi mock connector on Anvil. Never set in normal builds. */
+  e2e: process.env.NEXT_PUBLIC_E2E === 'true',
 } as const;
