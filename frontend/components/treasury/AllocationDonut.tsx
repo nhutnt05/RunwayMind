@@ -22,7 +22,8 @@ export function AllocationDonut({ idle, vault, decimals }: { idle: string; vault
           <PieChart>
             <Pie data={data} dataKey="tokens" nameKey="name" innerRadius="55%" outerRadius="80%">
               {data.map((d, i) => (
-                <Cell key={d.name} fill={COLORS[i]} />
+                // Recharts renders each slice as role="img": label it so axe (svg-img-alt) and screen readers get a name.
+                <Cell key={d.name} fill={COLORS[i]} aria-label={`${d.name}: ${formatUsdc(BigInt(d.exact), decimals)} USDC`} />
               ))}
             </Pie>
             <Tooltip formatter={(_v, _n, item) => formatUsdc(BigInt((item.payload as { exact: string }).exact), decimals)} />

@@ -23,6 +23,7 @@ const LOOP = ['/', '/treasury', '/obligations', '/cash-ladder', '/vault', '/pool
 const RUNS = Number(process.env.PERF_RUNS ?? 5);
 const SLOW_RUNS = Number(process.env.PERF_SLOW_RUNS ?? 3);
 const API_DELAY_MS = 2_500;
+const HOVER_MS = Number(process.env.PERF_HOVER_MS ?? 0);
 const OUT = process.env.PERF_OUT ?? resolve(dirname(fileURLToPath(import.meta.url)), '.results', `${process.env.PERF_MODE ?? 'dev'}.json`);
 
 interface Sample {
@@ -33,6 +34,8 @@ interface Sample {
   visit: 'first' | 'repeat';
   url: number | null;
   active: number | null;
+  highlight: number | null;
+  loading: number | null;
   heading: number | null;
   ready: number | null;
   blankFrames: number;
@@ -53,6 +56,8 @@ declare global {
       t0: number;
       url: number | null;
       active: number | null;
+      highlight: number | null;
+      loading: number | null;
       heading: number | null;
       ready: number | null;
       blank: number;
@@ -77,18 +82,21 @@ function installSampler() {
       const p = window.__perf;
       const a = (ev.target as Element | null)?.closest?.('nav[aria-label="Main"] a');
       if (!p || !p.expect || !a) return;
-      Object.assign(p, { t0: performance.now(), url: null, active: null, heading: null, ready: null, blank: 0, old: 0, done: false });
+      Object.assign(p, { t0: performance.now(), url: null, active: null, highlight: null, loading: null, heading: null, ready: null, blank: 0, old: 0, done: false });
       const { href, heading } = p.expect;
       const tick = () => {
         const now = performance.now() - p.t0;
         if (p.url === null && location.pathname === href) p.url = now;
         const cur = document.querySelector('nav[aria-label="Main"] a[aria-current="page"]');
         if (p.active === null && cur?.getAttribute('href') === href) p.active = now;
+        const target = document.querySelector(`nav[aria-label='Main'] a[href='${href}']`);
+        if (p.highlight === null && target?.classList.contains('bg-slate-900')) p.highlight = now;
         const main = document.getElementById('main-content');
         const h1 = main?.querySelector('h1')?.textContent?.trim();
         if (!main || !(main.innerText ?? '').trim()) p.blank++;
         else if (h1 !== heading && location.pathname === href) p.old++;
         if (p.heading === null && h1 === heading) p.heading = now;
+        if (p.loading === null && main?.querySelector('[data-route-loading]')) p.loading = now;
         if (p.heading !== null && p.ready === null && main && !main.querySelector('[aria-busy="true"],[data-testid="skeleton-grid"]')) p.ready = now;
         if (p.ready !== null || now > 20_000) {
           p.done = true;
@@ -100,7 +108,7 @@ function installSampler() {
     },
     true,
   );
-  window.__perf = { expect: null, t0: 0, url: null, active: null, heading: null, ready: null, blank: 0, old: 0, longTasks, done: false };
+  window.__perf = { expect: null, t0: 0, url: null, active: null, highlight: null, loading: null, heading: null, ready: null, blank: 0, old: 0, longTasks, done: false };
 }
 
 async function waitReady(page: Page, href: string) {
@@ -116,8 +124,14 @@ async function waitReady(page: Page, href: string) {
 
 async function navigate(page: Page, reqs: Request[], scenario: string, run: number, from: string, to: string, visit: 'first' | 'repeat'): Promise<Sample> {
   await page.evaluate((e) => Object.assign(window.__perf!, { expect: e, done: false }), { href: to, heading: HEADINGS[to]! });
+  const link = page.locator(`nav[aria-label='Main'] a[href='${to}']`);
+  if (HOVER_MS > 0) {
+    // Real users hover a sidebar item briefly before clicking: lets the hover data prefetch start (PERF_HOVER_MS).
+    await link.hover();
+    await page.waitForTimeout(HOVER_MS);
+  }
   reqs.length = 0;
-  await page.locator(`nav[aria-label="Main"] a[href="${to}"]`).click();
+  await link.click();
   await page.waitForFunction(() => window.__perf?.done === true, undefined, { timeout: 120_000, polling: 50 });
   await page.waitForTimeout(500); // requests issued right after content-ready (mount fetches) still count
   const p = await page.evaluate(() => {
@@ -127,6 +141,8 @@ async function navigate(page: Page, reqs: Request[], scenario: string, run: numb
     return {
       url: s.url,
       active: s.active,
+      highlight: s.highlight,
+      loading: s.loading,
       heading: s.heading,
       ready: s.ready,
       blank: s.blank,
@@ -145,6 +161,8 @@ async function navigate(page: Page, reqs: Request[], scenario: string, run: numb
     visit,
     url: p.url,
     active: p.active,
+    highlight: p.highlight,
+    loading: p.loading,
     heading: p.heading,
     ready: p.ready,
     blankFrames: p.blank,
@@ -161,7 +179,10 @@ async function navigate(page: Page, reqs: Request[], scenario: string, run: numb
   return sample;
 }
 
-async function session(browser: Browser, scenario: string, run: number, slowApi: boolean, out: Sample[]) {
+type Scenario = 'normal' | 'slow-api' | 'slow-net';
+
+async function session(browser: Browser, scenario: Scenario, run: number, out: Sample[]) {
+  const slowApi = scenario === 'slow-api';
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await page.addInitScript(installSampler);
@@ -171,14 +192,20 @@ async function session(browser: Browser, scenario: string, run: number, slowApi:
       await route.continue().catch(() => undefined);
     });
   }
+  if (scenario === 'slow-net') {
+    // ~Fast-3G-like: 300 ms RTT, 1.6 Mbit/s down; navigation starts right after the dashboard is ready (prefetch may be in flight).
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Network.enable');
+    await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 300, downloadThroughput: 200_000, uploadThroughput: 100_000 });
+  }
   const reqs: Request[] = [];
   page.on('request', (r) => reqs.push(r));
   await page.goto('/');
   await waitReady(page, '/');
-  await page.waitForTimeout(3_000); // idle: lets production <Link> prefetch run
+  if (scenario !== 'slow-net') await page.waitForTimeout(3_000); // idle: lets production <Link> prefetch run
   const seen = new Set(['/']);
   let from = '/';
-  for (const to of [...PATH, ...(slowApi ? [] : [...LOOP.slice(1), ...LOOP, ...LOOP.slice(0, 1)])]) {
+  for (const to of [...PATH, ...(scenario !== 'normal' ? [] : [...LOOP.slice(1), ...LOOP, ...LOOP.slice(0, 1)])]) {
     if (to === from) continue;
     out.push(await navigate(page, reqs, scenario, run, from, to, seen.has(to) ? 'repeat' : 'first'));
     seen.add(to);
@@ -190,8 +217,9 @@ async function session(browser: Browser, scenario: string, run: number, slowApi:
 
 test('navigation performance', async ({ browser }) => {
   const samples: Sample[] = [];
-  for (let run = 1; run <= RUNS; run++) await session(browser, 'normal', run, false, samples);
-  for (let run = 1; run <= SLOW_RUNS; run++) await session(browser, 'slow-api', run, true, samples);
+  for (let run = 1; run <= RUNS; run++) await session(browser, 'normal', run, samples);
+  for (let run = 1; run <= SLOW_RUNS; run++) await session(browser, 'slow-api', run, samples);
+  for (let run = 1; run <= SLOW_RUNS; run++) await session(browser, 'slow-net', run, samples);
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(samples, null, 1));
 });

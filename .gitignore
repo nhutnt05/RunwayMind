@@ -3,10 +3,23 @@
 .env.*
 !.env.example
 
-# databases
+# private keys / wallets (deployer, agent, keeper keys must only live in .env)
+*.pem
+*.key
+*.p12
+keystore/
+keystores/
+.secret*
+mnemonic*.txt
+
+# databases and local backups
 *.db
 *.db-journal
 *.db.bak
+*.sqlite
+*.sqlite-journal
+*.bak
+backend/prisma/backup/
 
 # foundry
 out/
@@ -22,14 +35,35 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
+# tool caches / coverage
+.eslintcache
+.turbo/
+.cache/
+lcov.info
+*.lcov
+
+# editors / OS (the shared .vscode/settings.json stays tracked)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+Thumbs.db
+desktop.ini
+
+# Claude Code: personal local settings
+.claude/settings.local.json
+
 # misc
 .DS_Store
 *.log
+*.tmp
+tmp/
 
-# docs: engineering spec stays private; CP2 / D6-A1 evidence reports are published
+# docs: engineering spec stays private; CP2 evidence reports are published
 docs/*
 !docs/CP2_REPORT.md
-!docs/USDC_SMOKE_TEST.md
 !docs/cp2-evidence/
 
 # Playwright E2E (frontend/e2e/stack.ts)
@@ -39,4 +73,6 @@ frontend/e2e/.state/
 frontend/.next-perf/
 frontend/test-results/
 frontend/playwright-report/
+frontend/blob-report/
+frontend/e2e/perf/.results/
 backend/prisma/e2e.db*

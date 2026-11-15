@@ -30,7 +30,14 @@ const isoDate = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
  * "Confirm & sign" per draft (POST /obligations with nlDraftId → wallet). The LLM only suggests; every draft is
  * re-validated by the API, simulated and signed by the ADMIN.
  */
-export function NaturalLanguageInput({ gate }: { gate: AdminGate }) {
+export function NaturalLanguageInput({
+  gate,
+  onCreated,
+}: {
+  gate: AdminGate;
+  /** Called after each draft's creation is confirmed on-chain (label of the new obligation). */
+  onCreated?: (label: string) => void;
+}) {
   const [text, setText] = useState('');
   const [locale, setLocale] = useState<'vi' | 'en'>('vi');
   const [rows, setRows] = useState<Row[]>([]);
@@ -65,6 +72,7 @@ export function NaturalLanguageInput({ gate }: { gate: AdminGate }) {
         prepare: () => api.postValidated<typeof CreateObligationRequestSchema, PrepareTxResponse>('/obligations', CreateObligationRequestSchema, body),
       });
       update(row.draftId, { state: 'done' });
+      onCreated?.(body.label);
     } catch (e) {
       update(row.draftId, { state: 'error', error: (e as Error).message });
     }

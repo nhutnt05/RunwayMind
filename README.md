@@ -61,7 +61,7 @@ flowchart TB
     PE["PolicyEngine"]
     VA["VaultAdapter"]
     MP["MockLendingPool"]
-    MU["MockUSDC / Circle USDC"]
+    MU["MockUSDC"]
   end
   UI --> API
   UI --> W
@@ -112,8 +112,7 @@ Hacked-agent demo: `pnpm demo:attack` sends five attacks with the AGENT key (tra
 
 ## Deployed contracts — Avalanche Fuji (43113)
 
-All contracts are verified on Snowtrace. Machine-readable copies: [deployment/fuji.json](deployment/fuji.json),
-[deployment/fuji-usdc.json](deployment/fuji-usdc.json).
+All contracts are verified on Snowtrace. Machine-readable copy: [deployment/fuji.json](deployment/fuji.json).
 
 **Demo treasury (MockUSDC, demo mode)** — deploy block `60935515` (CP2 Run 2, [docs/CP2_REPORT.md](docs/CP2_REPORT.md))
 
@@ -125,17 +124,6 @@ All contracts are verified on Snowtrace. Machine-readable copies: [deployment/fu
 | VaultAdapter | [`0x31762954AdDD4FbAB318B9Ac375083434BA01d66`](https://testnet.snowtrace.io/address/0x31762954AdDD4FbAB318B9Ac375083434BA01d66) |
 | MockLendingPool | [`0x7300607b351A7D0295b81A798264b35B54d91fDa`](https://testnet.snowtrace.io/address/0x7300607b351A7D0295b81A798264b35B54d91fDa) |
 | MockUSDC (6 decimals) | [`0x561c9B3C8532C577a4b65D0b1E881FB485e58B50`](https://testnet.snowtrace.io/address/0x561c9B3C8532C577a4b65D0b1E881FB485e58B50) |
-
-**Real-USDC treasury (Circle USDC `0x5425890298aed601595a70AB815c96711a31Bc65`)** — deploy block `60926117`,
-smoke test: [docs/USDC_SMOKE_TEST.md](docs/USDC_SMOKE_TEST.md)
-
-| Contract | Address |
-|---|---|
-| Treasury | [`0x9266315F3A56f58c388a7806A845e2E142Db1281`](https://testnet.snowtrace.io/address/0x9266315F3A56f58c388a7806A845e2E142Db1281) |
-| ObligationRegistry | [`0xCF51e2a0D381D6784f49Ce6eA464F304D2887b29`](https://testnet.snowtrace.io/address/0xCF51e2a0D381D6784f49Ce6eA464F304D2887b29) |
-| PolicyEngine | [`0x74507fDa9103A17ECEDeA9aD125f221a1Ebb0941`](https://testnet.snowtrace.io/address/0x74507fDa9103A17ECEDeA9aD125f221a1Ebb0941) |
-| VaultAdapter | [`0x64f4B89e58a4a66cCd76BfF053932Ee293599528`](https://testnet.snowtrace.io/address/0x64f4B89e58a4a66cCd76BfF053932Ee293599528) |
-| MockLendingPool (USDC) | [`0x38a37946ed9B9efD9396EfdD21b8d682E7652090`](https://testnet.snowtrace.io/address/0x38a37946ed9B9efD9396EfdD21b8d682E7652090) |
 
 | Role | Address |
 |---|---|
@@ -170,8 +158,7 @@ pnpm dev                                                                        
 ```
 
 Fuji: set the keys and RPC in `.env` (docs/11 §4), deploy with docs/11 §7, then `pnpm dev`. Useful scripts:
-`pnpm demo:attack` (hacked-agent scene), `pnpm demo:usdc-smoke` (real-USDC smoke run), `pnpm demo:reset` (fresh demo
-deployment). Free-tier RPCs limit `eth_getLogs`; set `INDEXER_BLOCK_RANGE` in `.env` (e.g. 5–10) when using one.
+`pnpm demo:attack` (hacked-agent scene), `pnpm demo:reset` (fresh demo deployment). Free-tier RPCs limit `eth_getLogs`; set `INDEXER_BLOCK_RANGE` in `.env` (e.g. 5–10) when using one.
 
 ## Team
 

@@ -10,6 +10,16 @@ import { describeStageError, formatDecodedError, verifyRegistryTx, type Registry
 import { newToastId, txTracker } from '@/lib/txTracker';
 import { wagmiConfig } from '@/lib/wagmi';
 
+/**
+ * Progress of one registry write, for UIs that show the transaction lifecycle inline (e.g. the cancel-obligation
+ * dialog). Emitted at the same points as the toast updates; purely informational, it never changes the flow.
+ */
+export type RegistryWriteProgress =
+  | { phase: 'preparing' }
+  | { phase: 'simulating' }
+  | { phase: 'wallet' }
+  | { phase: 'confirming'; hash: `0x${string}` };
+
 export interface RegistryWriteInput {
   /** Toast title, e.g. "Create obligation". */
   title: string;
@@ -17,6 +27,8 @@ export interface RegistryWriteInput {
   functionName: RegistryWriteFunction;
   /** Calls the backend prepare endpoint (docs/07 §5.1–§5.3). */
   prepare: () => Promise<ApiResult<PrepareTxResponse>>;
+  /** Optional lifecycle callback (see RegistryWriteProgress). */
+  onProgress?: (p: RegistryWriteProgress) => void;
 }
 
 export interface RegistryWriteResult {
@@ -37,10 +49,11 @@ export function useRegistryWrite() {
     Promise.all(REGISTRY_WRITE_INVALIDATES.map((queryKey) => qc.invalidateQueries({ queryKey: [...queryKey] })));
 
   return useMutation<RegistryWriteResult, Error, RegistryWriteInput>({
-    mutationFn: async ({ title, kind, functionName, prepare }) => {
+    mutationFn: async ({ title, kind, functionName, prepare, onProgress }) => {
       const id = newToastId(kind.toLowerCase());
       const toast = (patch: Parameters<typeof txTracker.upsert>[0]) => txTracker.upsert(patch);
       toast({ id, title, status: 'PENDING', message: 'Preparing transaction…' });
+      onProgress?.({ phase: 'preparing' });
       let sent: `0x${string}` | null = null;
       let stage: WriteStage = 'prepare';
       try {
@@ -62,6 +75,7 @@ export function useRegistryWrite() {
 
         stage = 'simulate';
         toast({ id, message: 'Simulating…' });
+        onProgress?.({ phase: 'simulating' });
         const { request } = await simulateContract(wagmiConfig, {
           address: call.address,
           abi: registry.abi,
@@ -73,9 +87,11 @@ export function useRegistryWrite() {
 
         stage = 'wallet';
         toast({ id, message: 'Confirm in your wallet…' });
+        onProgress?.({ phase: 'wallet' });
         const hash = await writeContract(wagmiConfig, request as never);
         sent = hash;
         toast({ id, hash, message: 'Waiting for confirmation…' });
+        onProgress?.({ phase: 'confirming', hash });
 
         // Register for backend tracking (links ObligationMetadata via relatedDraftId). Best effort: the event indexer
         // picks the tx up anyway, so a failure here must not hide the on-chain result.

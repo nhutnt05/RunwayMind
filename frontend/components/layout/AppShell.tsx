@@ -15,11 +15,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </a>
       <TopBar />
       <NetworkGuard />
-      <div className="mx-auto flex w-full max-w-screen-2xl flex-1">
+      {/* Sidebar is flush with the left edge at every width; only the page content is width-capped and centred. */}
+      <div className="flex w-full flex-1">
         <SideNav />
         {/* pb-20 leaves room for the mobile bottom navigation bar */}
         <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6 pb-20 focus:outline-none focus-visible:ring-0 md:px-6 lg:pb-6">
-          {children}
+          <div className="mx-auto w-full max-w-[1920px]">{children}</div>
         </main>
       </div>
     </div>

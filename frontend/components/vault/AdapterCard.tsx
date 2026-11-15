@@ -131,9 +131,6 @@ export function AdapterCard({
         <p className="text-sm font-semibold text-slate-900">
           Max investable now: <AmountText value={headroom.maxInvestable} />
         </p>
-        <p>
-          R1 reserve headroom <AmountText value={headroom.r1} symbol={null} /> · R3 exposure headroom <AmountText value={headroom.r3} symbol={null} />
-        </p>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">

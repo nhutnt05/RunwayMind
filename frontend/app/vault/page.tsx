@@ -15,7 +15,7 @@ export default function VaultPage() {
 
   return (
     <>
-      <PageHeader title="Yield Vault" description="Adapter balances, APY, liquidity and manual invest / withdraw." />
+      <PageHeader title="Yield Vault"/>
       <AdminGateNotice gate={gate} context="Invest and withdraw are disabled." />
       {overview.isError && !o ? (
         <ErrorState title="Could not load adapters" message={(overview.error as Error).message} onRetry={() => void overview.refetch()} />

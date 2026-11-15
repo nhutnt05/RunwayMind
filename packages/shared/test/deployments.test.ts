@@ -28,7 +28,7 @@ describe('loadDeployment', () => {
     expect(d.contracts.Treasury).toBe(A(4));
   });
 
-  it('accepts a real-USDC deployment without MockUSDC', () => {
+  it('accepts a deployment without MockUSDC (schema stays asset-agnostic)', () => {
     const { MockUSDC: _omit, ...contracts } = fuji.contracts;
     expect(loadDeployment({ ...fuji, contracts }).contracts.MockUSDC).toBeUndefined();
   });
@@ -40,7 +40,7 @@ describe('loadDeployment', () => {
 });
 
 describe('deploymentForChain with a secondary treasury on the same chain (D6-A1)', () => {
-  it('prefers the primary file (fuji) over fuji-usdc regardless of map order', async () => {
+  it('prefers the primary file (fuji) over a suffixed file regardless of map order', async () => {
     const { deploymentForChain } = await import('../src/deployments');
     const dep = (treasury: string) => ({
       chainId: 43113,
@@ -56,9 +56,9 @@ describe('deploymentForChain with a secondary treasury on the same chain (D6-A1)
       },
       roles: { admin: '0x0000000000000000000000000000000000000006', agent: '0x0000000000000000000000000000000000000007' },
     });
-    const usdc = dep('0x00000000000000000000000000000000000000Aa');
+    const second = dep('0x00000000000000000000000000000000000000Aa');
     const primary = dep('0x00000000000000000000000000000000000000bB');
-    expect(deploymentForChain({ 'fuji-usdc': usdc, fuji: primary }, 43113)?.contracts.Treasury.toLowerCase()).toBe('0x00000000000000000000000000000000000000bb');
-    expect(deploymentForChain({ 'fuji-usdc': usdc }, 43113)?.contracts.Treasury.toLowerCase()).toBe('0x00000000000000000000000000000000000000aa');
+    expect(deploymentForChain({ 'fuji-second': second, fuji: primary }, 43113)?.contracts.Treasury.toLowerCase()).toBe('0x00000000000000000000000000000000000000bb');
+    expect(deploymentForChain({ 'fuji-second': second }, 43113)?.contracts.Treasury.toLowerCase()).toBe('0x00000000000000000000000000000000000000aa');
   });
 });

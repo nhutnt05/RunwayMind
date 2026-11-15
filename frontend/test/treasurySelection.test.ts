@@ -21,18 +21,18 @@ const t = (id: string, isPrimary: boolean, n: number): TreasuryInfo => ({
   registryAddress: A(n + 1),
   policyAddress: A(n + 2),
   assetAddress: A(n + 3),
-  assetSymbol: id.endsWith('usdc') && !id.includes('musdc') ? 'USDC' : 'mUSDC',
+  assetSymbol: 'mUSDC',
   assetDecimals: 6,
   demoStartTime: 1,
   deployBlock: '1',
   poolAddress: A(n + 4),
   adapterAddress: A(n + 5),
 });
-const LIST = [t('fuji-musdc', true, 0x10), t('fuji-usdc', false, 0x20)];
+const LIST = [t('fuji-musdc', true, 0x10), t('fuji-second', false, 0x20)];
 
 describe('resolveSelectedTreasury', () => {
   it('stored id if listed, else primary, else first; null for empty list', () => {
-    expect(resolveSelectedTreasury(LIST, 'fuji-usdc')?.id).toBe('fuji-usdc');
+    expect(resolveSelectedTreasury(LIST, 'fuji-second')?.id).toBe('fuji-second');
     expect(resolveSelectedTreasury(LIST, 'gone')?.id).toBe('fuji-musdc');
     expect(resolveSelectedTreasury(LIST, null)?.id).toBe('fuji-musdc');
     expect(resolveSelectedTreasury([t('b', false, 1), t('c', false, 2)], null)?.id).toBe('b');
@@ -42,8 +42,8 @@ describe('resolveSelectedTreasury', () => {
 
 describe('withTreasuryParam', () => {
   it('adds or replaces treasury=<id>, keeps other params, no-op for null', () => {
-    expect(withTreasuryParam('/treasury/overview', 'fuji-usdc')).toBe('/treasury/overview?treasury=fuji-usdc');
-    expect(withTreasuryParam('/obligations?status=ACTIVE', 'fuji-usdc')).toBe('/obligations?status=ACTIVE&treasury=fuji-usdc');
+    expect(withTreasuryParam('/treasury/overview', 'fuji-second')).toBe('/treasury/overview?treasury=fuji-second');
+    expect(withTreasuryParam('/obligations?status=ACTIVE', 'fuji-second')).toBe('/obligations?status=ACTIVE&treasury=fuji-second');
     expect(withTreasuryParam('/x?treasury=a&limit=5', 'b')).toBe('/x?treasury=b&limit=5');
     expect(withTreasuryParam('/health', null)).toBe('/health');
   });
@@ -52,7 +52,7 @@ describe('withTreasuryParam', () => {
 describe('treasury store', () => {
   it('readStoredTreasuryId tolerates missing / throwing storage', () => {
     expect(readStoredTreasuryId(undefined)).toBeNull();
-    expect(readStoredTreasuryId({ getItem: () => 'fuji-usdc' })).toBe('fuji-usdc');
+    expect(readStoredTreasuryId({ getItem: () => 'fuji-second' })).toBe('fuji-second');
     expect(readStoredTreasuryId({ getItem: () => { throw new Error('blocked'); } })).toBeNull();
     expect(TREASURY_STORAGE_KEY).toBe('runwaymind.treasury');
   });
@@ -60,14 +60,14 @@ describe('treasury store', () => {
   it('set → get → listeners notified; api client appends the selected treasury to every request', async () => {
     const seen: string[] = [];
     const unsub = subscribeTreasury(() => seen.push(String(getSelectedTreasuryId())));
-    setSelectedTreasuryId('fuji-usdc');
-    expect(getSelectedTreasuryId()).toBe('fuji-usdc');
-    expect(seen).toEqual(['fuji-usdc']);
+    setSelectedTreasuryId('fuji-second');
+    expect(getSelectedTreasuryId()).toBe('fuji-second');
+    expect(seen).toEqual(['fuji-second']);
 
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ success: true, data: [], error: null, meta: { requestId: 'r' } })));
     const client = createApiClient('http://api.test/api/v1', fetchImpl as unknown as typeof fetch);
     await client.get('/obligations?status=ACTIVE');
-    expect(String((fetchImpl.mock.calls[0] as unknown[])[0])).toBe('http://api.test/api/v1/obligations?status=ACTIVE&treasury=fuji-usdc');
+    expect(String((fetchImpl.mock.calls[0] as unknown[])[0])).toBe('http://api.test/api/v1/obligations?status=ACTIVE&treasury=fuji-second');
 
     setSelectedTreasuryId(null);
     await client.get('/health');

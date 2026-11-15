@@ -1,24 +1,30 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AgentSettingsUpdateSchema, formatUsdc } from '@runwaymind/shared';
 import { AddressChip, AmountText, EmptyState, GatedButton, SnowtraceLink, StateChip } from '@/components/ui';
+import { ModeSwitchDialog, type AgentMode } from '@/components/agent/ModeSwitchDialog';
+import { AGENT_ACTIVITY_LIMIT } from '@/lib/queries';
 import { api, type AgentSettingsJson, type KeeperStatusJson } from '@/lib/api';
 import type { AdminGate } from '@/lib/recommendations';
-import { activityError, blockedLabel, filterActivity, isBlocked, type ActivityItemJson, type ActivityType } from '@/lib/views';
+import { activityError, blockedLabel, filterActivity, isBlocked, paginate, type ActivityItemJson, type ActivityType } from '@/lib/views';
 
 const ago = (at: number) => new Date(at * 1000).toLocaleString();
 
-/** APPROVE ↔ AUTO with a confirm dialog (docs/08 §3.8); PUT /agent/settings audits MODE_CHANGED. */
+/** APPROVE ↔ AUTO with a confirmation dialog (docs/08 §3.8); PUT /agent/settings audits MODE_CHANGED. */
 export function ModeSwitch({ settings, gate }: { settings: AgentSettingsJson | undefined; gate: AdminGate }) {
   const qc = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
   const change = useMutation({
-    mutationFn: (mode: 'APPROVE' | 'AUTO') => api.putValidated('/agent/settings', AgentSettingsUpdateSchema, { mode }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['agent'] }),
+    mutationFn: (mode: AgentMode) => api.putValidated('/agent/settings', AgentSettingsUpdateSchema, { mode }),
+    onSuccess: () => {
+      setConfirming(false);
+      return qc.invalidateQueries({ queryKey: ['agent'] });
+    },
   });
   const mode = settings?.mode;
-  const next = mode === 'AUTO' ? 'APPROVE' : 'AUTO';
+  const next: AgentMode = mode === 'AUTO' ? 'APPROVE' : 'AUTO';
   return (
     <section aria-label="Agent mode" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -35,20 +41,20 @@ export function ModeSwitch({ settings, gate }: { settings: AgentSettingsJson | u
         disabled={!mode || change.isPending}
         className="mt-3 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium"
         onClick={() => {
-          const msg =
-            next === 'AUTO'
-              ? 'Switch to AUTO mode? The agent will invest and withdraw without asking. Contract policy still enforces R1–R6.'
-              : 'Switch back to APPROVE mode? New recommendations will wait for approval.';
-          if (window.confirm(msg)) change.mutate(next);
+          change.reset();
+          setConfirming(true);
         }}
       >
         Switch to {next}
       </GatedButton>
-      {change.error ? (
-        <p role="alert" className="mt-2 text-xs text-red-800">
-          {(change.error as Error).message}
-        </p>
-      ) : null}
+      <ModeSwitchDialog
+        open={confirming}
+        target={next}
+        pending={change.isPending}
+        error={change.error ? (change.error as Error).message : null}
+        onConfirm={() => change.mutate(next)}
+        onClose={() => setConfirming(false)}
+      />
     </section>
   );
 }
@@ -141,20 +147,35 @@ function ActivityRow({ item }: { item: ActivityItemJson }) {
 
 const FILTERS: (ActivityType | 'ALL')[] = ['ALL', 'DECISION', 'ACTION', 'KEEPER_RUN'];
 
+const ACTIVITY_PAGE_SIZE = 10;
+
 export function ActivityTimeline({ items }: { items: ActivityItemJson[] }) {
   const [filter, setFilter] = useState<ActivityType | 'ALL'>('ALL');
+  const [page, setPage] = useState(1);
   const shown = filterActivity(items, filter);
+  const slice = paginate(shown, page, ACTIVITY_PAGE_SIZE);
+  const listRef = useRef<HTMLHeadingElement>(null);
+  const go = (p: number) => {
+    setPage(p);
+    // Keep the reader at the top of the list they are paging through.
+    listRef.current?.scrollIntoView({ block: 'nearest' });
+  };
   return (
     <section aria-label="Activity timeline" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">Activity</h2>
+        <h2 ref={listRef} className="text-sm font-semibold text-slate-900">
+          Activity
+        </h2>
         <div role="group" aria-label="Filter activity" className="flex gap-1">
           {FILTERS.map((f) => (
             <button
               key={f}
               type="button"
               aria-pressed={filter === f}
-              onClick={() => setFilter(f)}
+              onClick={() => {
+                setFilter(f);
+                setPage(1);
+              }}
               className={`rounded-md px-2 py-1 text-xs ${filter === f ? 'bg-slate-900 text-white' : 'border border-slate-300'}`}
             >
               {f.replace('_', ' ')}
@@ -165,11 +186,42 @@ export function ActivityTimeline({ items }: { items: ActivityItemJson[] }) {
       {shown.length === 0 ? (
         <EmptyState title="No agent activity yet" description="Decisions appear here after the first agent tick." />
       ) : (
-        <ol className="space-y-2">
-          {shown.map((i) => (
-            <ActivityRow key={`${i.type}-${i.id}`} item={i} />
-          ))}
-        </ol>
+        <>
+          <ol className="space-y-2" start={slice.from}>
+            {slice.items.map((i) => (
+              <ActivityRow key={`${i.type}-${i.id}`} item={i} />
+            ))}
+          </ol>
+          <nav aria-label="Activity pages" className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-sm">
+            <p className="text-xs text-slate-600" aria-live="polite" data-testid="activity-range">
+              {slice.from}–{slice.to} of {slice.total}
+              {items.length >= AGENT_ACTIVITY_LIMIT ? ' most recent' : ''}
+            </p>
+            {slice.pageCount > 1 ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={slice.page <= 1}
+                  onClick={() => go(slice.page - 1)}
+                >
+                  Previous
+                </button>
+                <span className="text-xs tabular-nums text-slate-700">
+                  Page {slice.page} of {slice.pageCount}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={slice.page >= slice.pageCount}
+                  onClick={() => go(slice.page + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </nav>
+        </>
       )}
     </section>
   );

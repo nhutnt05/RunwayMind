@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 
 export default function AgentPage() {
   const gate = useAdminGate();
-  const activity = useAgentActivity(50);
+  const activity = useAgentActivity();
   const settings = useAgentSettings();
   const keeper = useKeeperStatus();
   const qc = useQueryClient();

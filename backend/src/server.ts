@@ -41,7 +41,7 @@ async function main() {
 
   const prisma = new PrismaClient({ datasourceUrl: cfg.DATABASE_URL });
   // Multi-treasury (D6-B1): every TreasuryConfig of this chain is served; primary = isPrimary (seed registers
-  // deployment/fuji.json as primary and deployment/fuji-usdc.json as secondary, docs/11 §7.2).
+  // deployment/fuji.json as primary; any further MockUSDC deployment file is a secondary treasury).
   const rows = await prisma.treasuryConfig.findMany({
     where: { chainId: cfg.CHAIN_ID },
     include: { pools: { orderBy: { addedAt: 'asc' } } },
@@ -155,7 +155,15 @@ async function main() {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
-  await app.listen({ port: cfg.PORT, host: '0.0.0.0' });
+  // Dual-stack ('::' also accepts IPv4): browsers resolve `localhost` to ::1 first, and an IPv4-only listener made every
+  // new connection wait ~200 ms for the IPv6→IPv4 fallback on Windows. Hosts without IPv6 fall back to IPv4 only.
+  try {
+    await app.listen({ port: cfg.PORT, host: '::' });
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code !== 'EAFNOSUPPORT' && code !== 'EADDRNOTAVAIL') throw e;
+    await app.listen({ port: cfg.PORT, host: '0.0.0.0' });
+  }
   for (const s of schedulers) await s.start();
 }
 

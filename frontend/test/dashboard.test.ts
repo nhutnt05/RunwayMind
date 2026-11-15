@@ -10,9 +10,10 @@ describe('dashboard display helpers', () => {
   it('dayIndex / dayLabel follow docs/04 §4.1', () => {
     expect(dayIndex(T0 + 16 * DAY, T0)).toBe(16);
     expect(dayIndex(T0 + 16 * DAY - 1, T0)).toBe(15);
-    expect(dayLabel(T0 + 31 * DAY, T0)).toBe('Day 31');
+    expect(dayLabel(T0 + 31 * DAY, T0)).toBe('30/11/26');
     expect(dayIndex(T0, null)).toBeNull();
-    expect(dayLabel(T0, null)).toBe('2026-10-30');
+    expect(dayLabel(T0, null)).toBe('30/10/26');
+    expect(dayLabel(Date.UTC(2027, 0, 5, 23, 59) / 1000)).toBe('05/01/27'); // UTC, zero-padded
   });
 
   it('countdown in whole days from chain time', () => {

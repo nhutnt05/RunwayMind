@@ -5,6 +5,7 @@ import {
   WEEKLY_INTERVAL_SEC,
   buildCreateObligationRequest,
   buildUpdateObligationRequest,
+  updateNeedsSignature,
   createObligationFormSchema,
   intervalLabel,
   toCreateObligationRequest,
@@ -130,6 +131,37 @@ describe('PATCH body (docs/07 §5.2)', () => {
     expect(buildUpdateObligationRequest(original, v)).toEqual({ amount: '25000000000', label: 'Payroll v2' });
     const d = { ...toEditValues(original), nextDueDate: '2026-12-16' };
     expect(buildUpdateObligationRequest(original, d)).toEqual({ nextDueDate: DEC_15_2026 + DAY });
+  });
+
+  // Regression: due dates with a time of day (relative "in 7 days" offsets, seeded demo data) are not midnight. An
+  // untouched date field used to send nextDueDate = 00:00 UTC, turning a label/notes edit into a signed on-chain
+  // update that also moved the due date.
+  describe('due date with a time of day (not 00:00 UTC)', () => {
+    const timed = { ...original, nextDueDate: DEC_15_2026 + 13 * 3_600 + 37 * 60 }; // 2026-12-15 13:37 UTC
+
+    it('untouched form → empty body', () => {
+      expect(buildUpdateObligationRequest(timed, toEditValues(timed))).toEqual({});
+    });
+
+    it('label or notes only → off-chain body, no nextDueDate, no signature', () => {
+      const v = { ...toEditValues(timed), label: 'Payroll (renamed)', notes: 'Paid from ops wallet' };
+      const body = buildUpdateObligationRequest(timed, v);
+      expect(body).toEqual({ label: 'Payroll (renamed)', notes: 'Paid from ops wallet' });
+      expect(updateNeedsSignature(body)).toBe(false);
+    });
+
+    it('picking another day → nextDueDate (00:00 UTC of that day), needs a signature', () => {
+      const body = buildUpdateObligationRequest(timed, { ...toEditValues(timed), nextDueDate: '2026-12-20' });
+      expect(body).toEqual({ nextDueDate: DEC_15_2026 + 5 * DAY });
+      expect(updateNeedsSignature(body)).toBe(true);
+    });
+  });
+
+  it('updateNeedsSignature: on-chain fields only', () => {
+    expect(updateNeedsSignature({})).toBe(false);
+    expect(updateNeedsSignature({ label: 'x', notes: null })).toBe(false);
+    expect(updateNeedsSignature({ amount: '1' })).toBe(true);
+    expect(updateNeedsSignature({ recipient: RECIPIENT })).toBe(true);
   });
 });
 

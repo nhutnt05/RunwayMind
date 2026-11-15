@@ -213,6 +213,11 @@ export function toEditValues(o: ObligationEditOriginal): ObligationEditValues {
   };
 }
 
+/** True when the update touches on-chain fields (recipient, amount, nextDueDate) and therefore needs a wallet signature. */
+export function updateNeedsSignature(body: z.input<typeof UpdateObligationRequestSchema>): boolean {
+  return body.recipient !== undefined || body.amount !== undefined || body.nextDueDate !== undefined;
+}
+
 /**
  * Only changed fields are sent: on-chain fields (recipient, amount, nextDueDate) produce a prepared
  * `updateObligation` tx, label/notes-only changes are applied off-chain (docs/07 §5.2). Throws
@@ -237,7 +242,10 @@ export function buildUpdateObligationRequest(
   } catch {
     throw new ObligationFormError('firstDueDate', 'Pick a valid date');
   }
-  if (due !== original.nextDueDate) body.nextDueDate = due;
+  // The form edits the due DATE (UTC day) only. Compare at day granularity: an untouched date field must not send
+  // `nextDueDate`, otherwise a label/notes-only edit would require a signature and silently move a due date that has
+  // a time of day (e.g. created as "in 7 days") to 00:00 UTC.
+  if (values.nextDueDate !== toIsoDateUtc(original.nextDueDate)) body.nextDueDate = due;
   if (values.label.trim() !== (original.label ?? '')) body.label = values.label.trim();
   const notes = values.notes.trim() === '' ? null : values.notes.trim();
   if (notes !== (original.notes ?? null)) body.notes = notes;

@@ -3,7 +3,7 @@ import type { Address, Amount, Category, OccurrenceProjection, UnixSeconds } fro
 
 export interface TreasuryConfig {
   // "Treasury" entity
-  id: string; // 'fuji-musdc' | 'fuji-usdc'
+  id: string; // e.g. 'fuji-musdc'
   chainId: 43113;
   treasuryAddress: Address;
   registryAddress: Address;

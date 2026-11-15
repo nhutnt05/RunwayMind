@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { DemoModeBannerView, DemoModeIndicator } from '../components/layout/DemoModeBadge';
+import { DemoModeIndicator } from '../components/layout/DemoModeBadge';
 import {
   AdminGateNotice,
   EmptyState,
@@ -147,7 +147,7 @@ describe('loading, empty and error states (docs/08 §8)', () => {
   });
 });
 
-describe('DEMO MODE banner and Day N badge (video visibility)', () => {
+describe('DEMO MODE · Day N badge (video visibility)', () => {
   it('badge shows DEMO MODE and the Day N chip in large, high-contrast type', () => {
     const out = html(<DemoModeIndicator day={12} />);
     expect(out).toContain('DEMO MODE');
@@ -159,13 +159,5 @@ describe('DEMO MODE banner and Day N badge (video visibility)', () => {
 
   it('badge omits the day when demoStartTime is unknown', () => {
     expect(html(<DemoModeIndicator day={null} />)).not.toContain('Day');
-  });
-
-  it('banner is a labelled status strip with the day and a not-in-production note', () => {
-    const out = html(<DemoModeBannerView day={3} />);
-    expect(out).toContain('role="status"');
-    expect(out).toContain('aria-label="Demo mode, day 3"');
-    expect(out).toContain('>Day 3<');
-    expect(out).toContain('not available in production');
   });
 });

@@ -36,7 +36,7 @@ export function loadDeployment(json: unknown): Deployment {
 
 /**
  * Picks and validates the deployment for a chain from the generated `deploymentFiles` map. The primary file
- * (`fuji`, `local` — no `-suffix`) wins over secondary treasuries on the same chain (e.g. `fuji-usdc`, docs/11 §7.2).
+ * (`fuji`, `local` — no `-suffix`) wins over secondary treasuries on the same chain (e.g. `fuji-second`).
  */
 export function deploymentForChain(files: Record<string, unknown>, chainId: number): Deployment | null {
   const ordered = Object.entries(files).sort(([a], [b]) => Number(a.includes('-')) - Number(b.includes('-')));

@@ -48,8 +48,46 @@ async function guard<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Coalesces concurrent identical reads and reuses the result for `ttlMs` (API reads only; the agent/keeper use their
+ * own readers). A dashboard load fires ~6 API requests at once that each need the same chain snapshot: they now
+ * share one set of RPC calls instead of six. Failures are never cached.
+ */
+export class ReadCoalescer<T> {
+  private inFlight: Promise<T> | null = null;
+  private cached: { value: T; at: number } | null = null;
+
+  constructor(
+    private readonly ttlMs: number,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  get(load: () => Promise<T>): Promise<T> {
+    if (this.cached && this.now() - this.cached.at < this.ttlMs) return Promise.resolve(this.cached.value);
+    if (this.inFlight) return this.inFlight;
+    const p = load().then(
+      (value) => {
+        this.cached = { value, at: this.now() };
+        this.inFlight = null;
+        return value;
+      },
+      (e: unknown) => {
+        this.inFlight = null;
+        throw e;
+      },
+    );
+    this.inFlight = p;
+    return p;
+  }
+}
+
+/** Snapshot reuse window for API reads: well under the 5 s UI refresh, so displayed data is never staler than before. */
+export const SNAPSHOT_TTL_MS = 1_000;
+
 export class ViemChainService implements ChainService {
   private agentRole: Hex | null = null;
+  private readonly snapshots = new ReadCoalescer<ChainSnapshot>(SNAPSHOT_TTL_MS);
+  private readonly allObligations = new ReadCoalescer<{ blockNumber: bigint; obligations: ObligationOnChain[] }>(SNAPSHOT_TTL_MS);
 
   constructor(
     private readonly client: PublicClient,
@@ -61,10 +99,14 @@ export class ViemChainService implements ChainService {
   }
 
   getSnapshot(): Promise<ChainSnapshot> {
-    return guard(() => readSnapshot(this.client, this.addresses));
+    return this.snapshots.get(() => guard(() => readSnapshot(this.client, this.addresses)));
   }
 
   getAllObligations() {
+    return this.allObligations.get(() => this.readAllObligations());
+  }
+
+  private readAllObligations() {
     return guard(async () => {
       const blockNumber = await this.client.getBlockNumber({ cacheTime: 0 });
       const count = (await this.client.readContract({

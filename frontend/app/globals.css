@@ -18,10 +18,100 @@ body {
   @apply outline-none ring-2 ring-sky-700 ring-offset-2;
 }
 
-/* Users who ask for less motion get static skeletons and spinners. */
+/* Modal dialogs (components/ui/Modal.tsx): soft slate backdrop with a light blur, short fade/rise on open. */
+.rm-modal::backdrop {
+  background-color: rgb(15 23 42 / 0.45);
+  backdrop-filter: blur(3px);
+}
+.rm-modal[open] {
+  animation: rm-modal-in 160ms ease-out;
+}
+.rm-modal[open]::backdrop {
+  animation: rm-backdrop-in 160ms ease-out;
+}
+@keyframes rm-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes rm-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Users who ask for less motion get static skeletons, spinners and dialogs. */
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse,
-  .animate-spin {
+  .animate-spin,
+  .rm-modal[open],
+  .rm-modal[open]::backdrop {
     animation: none;
   }
+}
+
+/* Two-handle range slider (components/cashLadder/DateRangeFilter): two native range inputs stacked on one track.
+   Only the thumbs take pointer events, so each handle can be dragged on its own. Thumb size = THUMB (18px). */
+.rm-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.rm-range::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+.rm-range::-moz-range-track {
+  background: transparent;
+}
+.rm-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px; /* centre on the 24px-high input */
+  border-radius: 9999px;
+  background: #fff;
+  border: 2px solid #0f172a;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.3);
+  cursor: grab;
+}
+.rm-range::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 2px solid #0f172a;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.3);
+  cursor: grab;
+}
+.rm-range:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+.rm-range:focus-visible {
+  outline: none;
+}
+.rm-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+.rm-range:focus-visible::-moz-range-thumb {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
 }

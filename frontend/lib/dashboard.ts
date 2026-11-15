@@ -9,9 +9,17 @@ export function dayIndex(t: number, t0: number | null | undefined): number | nul
   return Math.floor((t - t0) / SECONDS_PER_DAY);
 }
 
-export function dayLabel(t: number, t0: number | null | undefined): string {
-  const n = dayIndex(t, t0);
-  return n === null ? new Date(t * 1000).toISOString().slice(0, 10) : `Day ${n}`;
+/**
+ * Calendar date of a chain timestamp as DD/MM/YY (UTC, like every other chain time in the UI).
+ * Replaces the earlier "Day N" label so users see a real date; `_t0` is kept so existing call sites stay unchanged.
+ * The DEMO MODE badge still shows "Day N" via dayIndex.
+ */
+export function dayLabel(t: number, _t0?: number | null): string {
+  const d = new Date(t * 1000);
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const yy = String(d.getUTCFullYear() % 100).padStart(2, '0');
+  return `${dd}/${mm}/${yy}`;
 }
 
 /** Relative countdown in whole days from chain time: "in 5 days", "today", "2 days ago". */

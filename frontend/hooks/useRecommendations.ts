@@ -3,17 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RejectRecommendationRequestSchema } from '@runwaymind/shared';
 import { api, type AgentDecisionJson } from '@/lib/api';
+import { pendingRecommendationsQuery } from '@/lib/queries';
 import { DECISION_POLL_MS, isTerminalDecision } from '@/lib/recommendations';
 
 const LIST_REFRESH_MS = 5_000; // docs/08 §5 dashboard refresh
 
 /** `/recommendations?status=PENDING_APPROVAL` for the dashboard (docs/08 §1). */
 export function usePendingRecommendations() {
-  return useQuery({
-    queryKey: ['recommendations', 'PENDING_APPROVAL'],
-    queryFn: () => api.get<AgentDecisionJson[]>('/recommendations?status=PENDING_APPROVAL'),
-    refetchInterval: LIST_REFRESH_MS,
-  });
+  return useQuery({ ...pendingRecommendationsQuery(), refetchInterval: LIST_REFRESH_MS });
 }
 
 /** Single decision, polled every 2 s until it reaches a terminal status (docs/07 §7). */

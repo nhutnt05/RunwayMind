@@ -57,18 +57,135 @@ test('responsive: dashboard at 375 px has no horizontal scroll', async () => {
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 
-test('obligation creation: form → prepare → sign (mock wallet on Anvil) → row appears after receipt', async () => {
+test('obligation creation: list → Create obligation page → form → sign (mock wallet on Anvil) → row appears after receipt', async () => {
   await page.goto('/obligations');
   await signIn();
+  // The list page no longer embeds the creation tools; they live on /obligations/new.
+  await expect(page.getByRole('form', { name: 'Create obligation' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Natural language input' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Create obligation' }).click();
+  await expect(page).toHaveURL(/\/obligations\/new$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Create Obligation');
+  await expect(page.locator('nav[aria-label="Main"] a[aria-current="page"]').first()).toHaveAttribute('href', '/obligations');
   const form = page.getByRole('form', { name: 'Create obligation' });
   await form.getByLabel('Label').fill('E2E vendor invoice');
   await form.getByLabel('Category').selectOption('VENDOR_INVOICE');
   await form.getByLabel('Recipient address').fill(R6);
   await form.getByLabel('Amount (USDC)').fill('1234');
   await form.getByLabel(/First due date/).fill(isoInDays(60)); // outside the 14-day horizon: reserve stays 30,000
+  await form.getByLabel(/Notes/).fill('Invoice INV-42\nPay to vendor <b>Acme</b>');
   await form.getByRole('button', { name: 'Create & sign' }).click();
   await expect(page.getByText('Confirmed').first()).toBeVisible({ timeout: 60_000 });
+  const created = page.getByRole('status').filter({ hasText: 'created on-chain' });
+  await expect(created).toContainText('E2E vendor invoice', { timeout: 60_000 });
+  await created.getByRole('link', { name: 'View obligations' }).click();
+  await expect(page).toHaveURL(/\/obligations$/);
   await expect(page.getByRole('cell', { name: /E2E vendor invoice/ }).first()).toBeVisible({ timeout: 60_000 });
+});
+
+test('cancel obligation: custom dialog (no native confirm) → Keep/Esc send nothing → double-click cancels once on-chain', async () => {
+  await page.goto('/obligations');
+  await signIn();
+  let nativeDialogs = 0;
+  const onNative = (d: { dismiss: () => Promise<void> }) => {
+    nativeDialogs++;
+    void d.dismiss();
+  };
+  page.on('dialog', onNative);
+  const cancelPosts: string[] = [];
+  const onRequest = (r: { url: () => string; method: () => string }) => {
+    if (r.method() === 'POST' && /\/obligations\/[^/]+\/cancel/.test(r.url())) cancelPosts.push(r.url());
+  };
+  page.on('request', onRequest);
+  try {
+    const row = page.getByRole('row').filter({ hasText: 'E2E vendor invoice' });
+
+    // 0) Note column: the icon opens a popup with the note as plain text (line break kept, markup not rendered).
+    await row.getByRole('button', { name: 'View note for E2E vendor invoice' }).click();
+    const note = page.getByTestId('obligation-note-dialog');
+    await expect(page.getByRole('dialog', { name: 'Note' })).toBeVisible();
+    await expect(note).toContainText('Invoice INV-42');
+    await expect(note).toContainText('Pay to vendor <b>Acme</b>');
+    await expect(note.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(note).toBeHidden();
+    // A seeded obligation without a note shows "—" and no button.
+    const plain = page.getByRole('row').filter({ hasText: 'November payroll' });
+    await expect(plain.getByLabel('No note')).toBeVisible();
+    await expect(plain.getByRole('button', { name: /View note/ })).toHaveCount(0);
+
+    const openDialog = () => row.getByRole('button', { name: /Cancel obligation E2E vendor invoice/ }).click();
+    const dialog = page.getByTestId('cancel-obligation-dialog');
+
+    // 1) Review: real obligation data + on-chain notice; the safe action has focus. Keep closes without a request.
+    await openDialog();
+    await expect(page.getByRole('dialog', { name: 'Cancel Obligation' })).toBeVisible();
+    await expect(dialog).toContainText('E2E vendor invoice');
+    await expect(dialog).toContainText('1,234.00');
+    await expect(dialog).toContainText('On-chain Action');
+    await expect(dialog.getByRole('button', { name: 'Keep Obligation' })).toBeFocused();
+    await dialog.getByRole('button', { name: 'Keep Obligation' }).click();
+    await expect(dialog).toBeHidden();
+
+    // 2) Esc also closes without a request.
+    await openDialog();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    expect(cancelPosts).toHaveLength(0);
+    await expect(row).toBeVisible();
+
+    // 3) Double-click "Cancel Obligation": exactly one cancellation flow, confirmed on-chain.
+    await openDialog();
+    await dialog.getByRole('button', { name: 'Cancel Obligation' }).dblclick();
+    await expect(dialog).toHaveAttribute('data-phase', 'success', { timeout: 60_000 });
+    await expect(dialog).toContainText('Obligation cancelled successfully.');
+    await expect(dialog.getByRole('link', { name: /View on Snowtrace/ })).toHaveAttribute('href', /\/tx\/0x[0-9a-f]{64}$/);
+    expect(cancelPosts).toHaveLength(1);
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole('cell', { name: /E2E vendor invoice/ })).toHaveCount(0, { timeout: 30_000 });
+    expect(nativeDialogs).toBe(0);
+  } finally {
+    page.off('dialog', onNative);
+    page.off('request', onRequest);
+  }
+});
+
+test('edit notes only: saved off-chain without a signature; due date (with a time of day) unchanged', async () => {
+  await page.goto('/obligations');
+  await signIn();
+  const writes: string[] = [];
+  const onRequest = (r: { url: () => string; method: () => string }) => {
+    // Any prepared on-chain update is registered via POST /transactions after signing.
+    if (r.method() === 'POST' && /\/api\/v1\/transactions(\?|$)/.test(r.url())) writes.push(r.url());
+  };
+  page.on('request', onRequest);
+  try {
+    const row = page.getByRole('row').filter({ hasText: 'Q1 grant' });
+    const dueBefore = (await row.getByRole('cell').nth(5).textContent()) ?? '';
+    await row.getByRole('button', { name: /Edit obligation Q1 grant/ }).click();
+    const form = page.getByRole('form', { name: /Edit obligation/ });
+    await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled(); // nothing changed yet
+    await form.getByLabel('Notes').fill('Grant tranche 1 of 3');
+    await expect(form.getByTestId('edit-signature-hint')).toHaveText(/saved off-chain: no wallet signature needed/);
+    await expect(form.getByRole('button', { name: 'Save & sign' })).toHaveCount(0);
+    await form.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(form).toBeHidden({ timeout: 30_000 });
+    await row.getByRole('button', { name: 'View note for Q1 grant' }).click();
+    await expect(page.getByTestId('obligation-note-dialog')).toContainText('Grant tranche 1 of 3');
+    await page.keyboard.press('Escape');
+    expect(writes).toHaveLength(0);
+    await expect(row.getByRole('cell').nth(5)).toHaveText(dueBefore);
+
+    // Changing an on-chain field switches the action to a signed update (not submitted here).
+    await row.getByRole('button', { name: /Edit obligation Q1 grant/ }).click();
+    await form.getByLabel('Amount (USDC)').fill('10001');
+    await expect(form.getByRole('button', { name: 'Save & sign' })).toBeVisible();
+    await form.getByRole('button', { name: 'Close' }).click();
+  } finally {
+    page.off('request', onRequest);
+  }
 });
 
 test('NL flow: parse (mocked API) → edit draft → confirm & sign on Anvil', async () => {
@@ -108,7 +225,7 @@ test('NL flow: parse (mocked API) → edit draft → confirm & sign on Anvil', a
     return route.continue({ postData: JSON.stringify({ ...body, nlDraftId: null }) });
   });
 
-  await page.goto('/obligations');
+  await page.goto('/obligations/new');
   await signIn();
   const nl = page.getByRole('region', { name: 'Natural language input' });
   await nl.getByLabel('Obligation description').fill(`hosting 500 USDC cho ${R6} sau 70 ngày`);
@@ -145,6 +262,46 @@ test('approval flow: evaluate → pending INVEST 70,000 → Approve → EXECUTED
   await expect(executed).toBeVisible({ timeout: 90_000 });
   const link = page.getByRole('link', { name: /on Snowtrace/ }).first();
   await expect(link).toHaveAttribute('href', /https:\/\/testnet\.snowtrace\.io\/tx\/0x[0-9a-f]{64}/);
+});
+
+test('agent mode: custom dialog (no native confirm); Esc and "Stay in APPROVE" send nothing', async () => {
+  await page.goto('/agent');
+  await signIn();
+  let nativeDialogs = 0;
+  const onNative = (d: { dismiss: () => Promise<void> }) => {
+    nativeDialogs++;
+    void d.dismiss();
+  };
+  const puts: string[] = [];
+  const onRequest = (r: { url: () => string; method: () => string }) => {
+    if (r.method() === 'PUT' && r.url().includes('/agent/settings')) puts.push(r.url());
+  };
+  page.on('dialog', onNative);
+  page.on('request', onRequest);
+  try {
+    const modeCard = page.getByRole('region', { name: 'Agent mode' });
+    const open = modeCard.getByRole('button', { name: 'Switch to AUTO' }); // shown only while the mode is APPROVE
+    await expect(open).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: 'Switch to AUTO mode?' });
+
+    await open.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('R1–R6');
+    await expect(dialog.getByRole('button', { name: 'Stay in APPROVE' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(open).toBeFocused(); // focus returns to the opener
+
+    await open.click();
+    await dialog.getByRole('button', { name: 'Stay in APPROVE' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(open).toBeVisible(); // still APPROVE
+    expect(puts).toEqual([]);
+    expect(nativeDialogs).toBe(0);
+  } finally {
+    page.off('dialog', onNative);
+    page.off('request', onRequest);
+  }
 });
 
 test('treasury switcher (mocked GET /treasuries): visible with two treasuries; selection is sent as ?treasury=', async () => {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { TransactionKind, TransactionStatus } from '@runwaymind/shared';
-import { AddressChip, EmptyState, ErrorState, PageHeader, SkeletonCard, SnowtraceLink, StateChip, TxStatusBadge } from '@/components/ui';
+import { EmptyState, ErrorState, PageHeader, SkeletonCard, SnowtraceLink, StateChip, TxStatusBadge } from '@/components/ui';
 import { useKeeperStatus, useTransactions } from '@/hooks/useApiQueries';
 import { deployment } from '@/lib/contracts';
 import { formatDecodedError } from '@/lib/preparedTx';
@@ -103,7 +103,6 @@ export default function TransactionsPage() {
                 <th className="px-4 py-2">Kind</th>
                 <th className="px-4 py-2">From</th>
                 <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Block</th>
                 <th className="px-4 py-2">Events / error</th>
                 <th className="px-4 py-2">Tx</th>
               </tr>
@@ -116,15 +115,14 @@ export default function TransactionsPage() {
                   <tr key={t.hash} className={`border-t border-slate-100 ${failed ? 'bg-red-50' : ''}`}>
                     <td className="px-4 py-2 font-medium">{t.kind.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-2">
-                      <div className="flex items-center gap-2">
+                      {/* Role only; the sender address stays available on hover and on Snowtrace via the Tx link. */}
+                      <span title={t.from}>
                         <StateChip state={role} tone={ROLE_TONE[role]} />
-                        <AddressChip address={t.from} />
-                      </div>
+                      </span>
                     </td>
                     <td className="px-4 py-2">
                       <TxStatusBadge status={t.status} />
                     </td>
-                    <td className="px-4 py-2 tabular-nums">{t.blockNumber ?? '—'}</td>
                     <td className="px-4 py-2 text-xs">
                       {t.error ? <span className="font-semibold text-red-800">{formatDecodedError(t.error)}</span> : t.decodedEvents.map((e) => e.name).join(', ') || '—'}
                     </td>

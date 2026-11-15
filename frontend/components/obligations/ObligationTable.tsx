@@ -5,8 +5,10 @@ import { UpdateObligationRequestSchema } from '@runwaymind/shared';
 import { AddressChip, AmountText, EmptyState, GatedButton, StateChip } from '@/components/ui';
 import { useRegistryWrite } from '@/hooks/useRegistryWrite';
 import { api, type ObligationItem, type PrepareTxResponse } from '@/lib/api';
+import { CancelObligationDialog } from './CancelObligationDialog';
+import { NoteButton, ObligationNoteDialog } from './ObligationNote';
 import { countdown, dayLabel } from '@/lib/dashboard';
-import { buildUpdateObligationRequest, intervalLabel, toEditValues, type ObligationEditValues } from '@/lib/obligationForm';
+import { buildUpdateObligationRequest, intervalLabel, toEditValues, updateNeedsSignature, type ObligationEditValues } from '@/lib/obligationForm';
 import type { AdminGate } from '@/lib/recommendations';
 
 interface Props {
@@ -14,6 +16,8 @@ interface Props {
   chainTime: number;
   demoStartTime: number | null;
   gate: AdminGate;
+  /** Treasury asset (from the overview), shown in the cancel dialog. */
+  asset?: { symbol: string; address: string } | null;
 }
 
 function recurrenceText(o: ObligationItem): string {
@@ -34,23 +38,30 @@ function editOriginal(o: ObligationItem) {
 }
 
 /** docs/08 §3.3 ObligationTable: table ≥ md, stacked cards < md (docs/08 §9). */
-export function ObligationTable({ obligations, chainTime, demoStartTime, gate }: Props) {
+export function ObligationTable({ obligations, chainTime, demoStartTime, gate, asset = null }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
-  const write = useRegistryWrite();
+  // Snapshot of the obligation being cancelled: the dialog keeps showing it after the row leaves the list.
+  const [cancelling, setCancelling] = useState<ObligationItem | null>(null);
+  const [viewingNote, setViewingNote] = useState<ObligationItem | null>(null);
+
+  const dialog = (
+    <>
+      <CancelObligationDialog
+        obligation={cancelling}
+        context={{ assetSymbol: asset?.symbol ?? null, assetAddress: asset?.address ?? null, chainTime, demoStartTime }}
+        onClose={() => setCancelling(null)}
+      />
+      <ObligationNoteDialog obligation={viewingNote} onClose={() => setViewingNote(null)} />
+    </>
+  );
 
   if (obligations.length === 0) {
-    return <EmptyState title="No obligations yet" description="No obligations yet — add payroll to start the Cash Ladder." />;
-  }
-
-  function cancel(o: ObligationItem) {
-    const name = o.metadata?.label ?? `#${o.id}`;
-    if (!window.confirm(`Cancel obligation ${name}? This is recorded on-chain.`)) return;
-    write.mutate({
-      title: `Cancel obligation ${name}`,
-      kind: 'CANCEL_OBLIGATION',
-      functionName: 'cancelObligation',
-      prepare: () => api.post<PrepareTxResponse>(`/obligations/${encodeURIComponent(o.id)}/cancel`),
-    });
+    return (
+      <>
+        <EmptyState title="No obligations yet" description="No obligations yet — add payroll to start the Cash Ladder." />
+        {dialog}
+      </>
+    );
   }
 
   const sorted = [...obligations].sort((a, b) => a.nextDueDate - b.nextDueDate);
@@ -60,7 +71,7 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate }:
       <div className="flex gap-2">
         <GatedButton
           gate={gate}
-          disabled={write.isPending}
+          disabled={cancelling !== null}
           onClick={() => setEditing(editing === o.id ? null : o.id)}
           className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100"
           aria-label={`Edit obligation ${o.metadata?.label ?? o.id}`}
@@ -69,8 +80,8 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate }:
         </GatedButton>
         <GatedButton
           gate={gate}
-          disabled={write.isPending}
-          onClick={() => cancel(o)}
+          disabled={cancelling !== null}
+          onClick={() => setCancelling(o)}
           className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50"
           aria-label={`Cancel obligation ${o.metadata?.label ?? o.id}`}
         >
@@ -81,11 +92,7 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate }:
 
   return (
     <div className="space-y-3">
-      {write.error ? (
-        <p role="alert" className="text-sm text-red-800">
-          {write.error.message}
-        </p>
-      ) : null}
+      {dialog}
 
       {/* ≥ md: table */}
       <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
@@ -102,12 +109,13 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate }:
               <th scope="col" className="px-3 py-2">Withdrawal deadline</th>
               <th scope="col" className="px-3 py-2">Recurrence</th>
               <th scope="col" className="px-3 py-2">State</th>
+              <th scope="col" className="px-3 py-2 text-center">Note</th>
               <th scope="col" className="px-3 py-2">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {sorted.map((o) => (
-              <FragmentRow key={o.id} colSpan={10} editor={editing === o.id ? <EditRow o={o} onDone={() => setEditing(null)} /> : null}>
+              <FragmentRow key={o.id} colSpan={11} editor={editing === o.id ? <EditRow o={o} onDone={() => setEditing(null)} /> : null}>
                 <td className="px-3 py-2 font-mono text-xs text-slate-600">#{o.id}</td>
                 <td className="px-3 py-2 font-medium text-slate-900">{o.metadata?.label ?? '—'}</td>
                 <td className="px-3 py-2 text-xs">{o.category.replace(/_/g, ' ')}</td>
@@ -120,6 +128,7 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate }:
                 <td className="px-3 py-2 text-xs">{o.status === 'ACTIVE' ? dayLabel(o.withdrawalDeadline, demoStartTime) : '—'}</td>
                 <td className="px-3 py-2 text-xs">{recurrenceText(o)}</td>
                 <td className="px-3 py-2"><StateChip state={o.derivedState} /></td>
+                <td className="px-3 py-2 text-center"><NoteButton o={o} onOpen={setViewingNote} /></td>
                 <td className="px-3 py-2">{actions(o)}</td>
               </FragmentRow>
             ))}
@@ -149,6 +158,8 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate }:
               <dd>{dayLabel(o.nextDueDate, demoStartTime)} ({countdown(o.nextDueDate, chainTime)})</dd>
               <dt className="text-slate-500">Withdraw by</dt>
               <dd>{dayLabel(o.withdrawalDeadline, demoStartTime)}</dd>
+              <dt className="self-center text-slate-500">Note</dt>
+              <dd><NoteButton o={o} onOpen={setViewingNote} /></dd>
             </dl>
             <div className="mt-2">{actions(o)}</div>
             {editing === o.id ? (
@@ -217,6 +228,17 @@ function EditRow({ o, onDone }: { o: ObligationItem; onDone: () => void }) {
     }
   }
 
+  // What Save will do with the current values: off-chain metadata only, or an on-chain update the wallet must sign.
+  let needsSignature = false;
+  let hasChanges = false;
+  try {
+    const pending = buildUpdateObligationRequest(original, values);
+    hasChanges = Object.keys(pending).length > 0;
+    needsSignature = updateNeedsSignature(pending);
+  } catch {
+    /* invalid input: reported on submit */
+  }
+
   const id = (k: string) => `edit-${o.id}-${k}`;
   return (
     <form onSubmit={submit} aria-label={`Edit obligation ${o.id}`} className="grid grid-cols-1 gap-3 md:grid-cols-5">
@@ -245,17 +267,24 @@ function EditRow({ o, onDone }: { o: ObligationItem; onDone: () => void }) {
           {error}
         </p>
       ) : null}
-      <div className="flex gap-2 md:col-span-5">
+      <div className="flex flex-wrap items-center gap-2 md:col-span-5">
         <button
           type="submit"
-          disabled={write.isPending}
+          disabled={write.isPending || !hasChanges}
           className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"
         >
-          {write.isPending ? 'Saving…' : 'Save'}
+          {write.isPending ? 'Saving…' : needsSignature ? 'Save & sign' : 'Save'}
         </button>
         <button type="button" onClick={onDone} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100">
           Close
         </button>
+        <p className="text-xs text-slate-500" data-testid="edit-signature-hint">
+          {!hasChanges
+            ? 'No changes yet.'
+            : needsSignature
+              ? 'Recipient, amount or due date changed: this is an on-chain update your wallet must sign.'
+              : 'Label and notes are saved off-chain: no wallet signature needed.'}
+        </p>
       </div>
     </form>
   );

@@ -4,14 +4,14 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
 import { appChain } from '@/lib/chains';
 import { CircuitBreakerBadge } from './CircuitBreakerBadge';
-import { DemoModeBadge, DemoModeBanner } from './DemoModeBadge';
+import { DemoModeBadge } from './DemoModeBadge';
 import { SignInButton } from './SignInButton';
 import { TreasurySwitcher } from './TreasurySwitcher';
 
 export function TopBar() {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-3 px-4 md:px-6">
+      <div className="flex h-16 items-center gap-3 px-4">
         <Link href="/" className="flex items-center gap-2 rounded-md font-semibold text-slate-900">
           <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-dark text-white">
             R
@@ -27,11 +27,11 @@ export function TopBar() {
           <TreasurySwitcher />
           <CircuitBreakerBadge />
           <SignInButton />
-          <ConnectButton chainStatus="icon" accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }} showBalance={false} />
+          {/* No chain button below sm: with a wallet connected it can render the network name and push the header past
+              375 px. A wrong network is still flagged by NetworkGuard's blocking banner. */}
+          <ConnectButton chainStatus={{ smallScreen: 'none', largeScreen: 'icon' }} accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }} showBalance={false} />
         </div>
       </div>
-      {/* DEMO MODE strip lives inside the sticky header so it is always on screen (video, docs/12). */}
-      <DemoModeBanner />
     </header>
   );
 }

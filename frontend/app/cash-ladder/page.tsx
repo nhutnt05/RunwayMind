@@ -5,13 +5,14 @@ import { LadderSummary, OccurrencesTable, WithdrawalScheduleTable } from '@/comp
 import { LiquidityProjectionChart } from '@/components/cashLadder/LiquidityProjectionChart';
 import { ErrorState, PageHeader, SkeletonCard } from '@/components/ui';
 import { useCashLadder, useOverview } from '@/hooks/useApiQueries';
+import { CASH_LADDER_DEFAULTS } from '@/lib/queries';
 import { ladderChartRows } from '@/lib/views';
 
 const PROJECTION_DAYS = [30, 60, 90, 180, 365] as const;
 
 export default function CashLadderPage() {
-  const [days, setDays] = useState<number>(60);
-  const [includeYield, setIncludeYield] = useState(true);
+  const [days, setDays] = useState<number>(CASH_LADDER_DEFAULTS.projectionDays);
+  const [includeYield, setIncludeYield] = useState<boolean>(CASH_LADDER_DEFAULTS.includeYield);
   const ladder = useCashLadder(days, includeYield);
   const overview = useOverview();
   const l = ladder.data?.data;

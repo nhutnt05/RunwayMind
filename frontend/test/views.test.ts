@@ -6,7 +6,10 @@ import {
   daysToSeconds,
   filterActivity,
   isBlocked,
+  chartRowsInRange,
+  utcDayKey,
   ladderChartRows,
+  paginate,
   percentToBps,
   policyHeadroom,
   txRole,
@@ -69,10 +72,45 @@ describe('blockedLabel (docs/08 §3.8)', () => {
 describe('ladderChartRows (docs/08 §3.4)', () => {
   it('whole-token geometry with exact strings preserved for the tooltip', () => {
     const rows = ladderChartRows([
-      { dayIndex: 0, date: 0, requiredReserve: '30000000000', projectedIdle: '30000000000', projectedVault: '70030680000', paymentsToday: '0', withdrawalsToday: '0' },
+      { dayIndex: 0, date: 1_794_000_000, requiredReserve: '30000000000', projectedIdle: '30000000000', projectedVault: '70030680000', paymentsToday: '0', withdrawalsToday: '0' },
     ]);
-    expect(rows[0]).toMatchObject({ day: 0, idleTokens: 30_000, vaultTokens: 70_030, requiredTokens: 30_000, paymentsTokens: 0 });
+    expect(rows[0]).toMatchObject({ day: 0, date: 1_794_000_000, idleTokens: 30_000, vaultTokens: 70_030, requiredTokens: 30_000, paymentsTokens: 0 });
     expect(rows[0]!.exact.vault).toBe('70030680000');
+    expect(rows[0]!.exact.withdrawals).toBe('0');
+  });
+});
+
+describe('chartRowsInRange (Liquidity projection date filter)', () => {
+  const D = 86_400;
+  const T = 1_794_000_000;
+  const rows = ladderChartRows(
+    [0, 1, 2, 3, 4].map((d) => ({ dayIndex: d, date: T + d * D, requiredReserve: '0', projectedIdle: '0', projectedVault: '0', paymentsToday: '0', withdrawalsToday: '0' })),
+  );
+  const days = (r: { day: number }[]) => r.map((x) => x.day);
+  const k = (d: number) => utcDayKey(T + d * D);
+  it('keeps the inclusive range', () => expect(days(chartRowsInRange(rows, k(1), k(3)))).toEqual([1, 2, 3]));
+  it('null bounds mean the full projection', () => expect(days(chartRowsInRange(rows, null, null))).toEqual([0, 1, 2, 3, 4]));
+  it('reversed bounds are swapped', () => expect(days(chartRowsInRange(rows, k(3), k(1)))).toEqual([1, 2, 3]));
+  it('unknown days fall back to the edges', () => expect(days(chartRowsInRange(rows, k(-9), k(2)))).toEqual([0, 1, 2]));
+  it('selection survives chain time moving forward within the day', () => {
+    const later = ladderChartRows(rows.map((r) => ({ dayIndex: r.day, date: r.date + 600, requiredReserve: '0', projectedIdle: '0', projectedVault: '0', paymentsToday: '0', withdrawalsToday: '0' })));
+    expect(days(chartRowsInRange(later, utcDayKey(T + D), utcDayKey(T + 3 * D)))).toEqual([1, 2, 3]);
+  });
+  it('empty input', () => expect(chartRowsInRange([], null, null)).toEqual([]));
+});
+
+describe('paginate (agent activity list)', () => {
+  const list = Array.from({ length: 23 }, (_, i) => i + 1);
+  it('slices pages with 1-based positions', () => {
+    expect(paginate(list, 1, 10)).toMatchObject({ items: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], page: 1, pageCount: 3, from: 1, to: 10, total: 23 });
+    expect(paginate(list, 3, 10)).toMatchObject({ items: [21, 22, 23], page: 3, from: 21, to: 23 });
+  });
+  it('clamps out-of-range pages (e.g. after a filter shrinks the list)', () => {
+    expect(paginate(list, 9, 10).page).toBe(3);
+    expect(paginate(list, 0, 10).page).toBe(1);
+  });
+  it('empty list: one page, nothing shown', () => {
+    expect(paginate([], 1, 10)).toEqual({ items: [], page: 1, pageCount: 1, from: 0, to: 0, total: 0 });
   });
 });
 

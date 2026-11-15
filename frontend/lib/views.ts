@@ -82,12 +82,14 @@ export interface DailyPointJson {
 
 export interface ChartRow {
   day: number;
+  /** Chain timestamp (seconds) of the day, for the DD/MM/YY axis and tooltip. */
+  date: number;
   /** Whole-token values for the chart geometry only; exact amounts are kept in `exact` for the tooltip. */
   idleTokens: number;
   vaultTokens: number;
   requiredTokens: number;
   paymentsTokens: number;
-  exact: { idle: string; vault: string; required: string; payments: string };
+  exact: { idle: string; vault: string; required: string; payments: string; withdrawals: string };
 }
 
 /** Base units → whole tokens (floor) for chart scaling. Never used for any amount that is sent anywhere. */
@@ -98,12 +100,52 @@ export function toChartTokens(baseUnits: string, decimals = 6): number {
 export function ladderChartRows(daily: readonly DailyPointJson[], decimals = 6): ChartRow[] {
   return daily.map((p) => ({
     day: p.dayIndex,
+    date: p.date,
     idleTokens: toChartTokens(p.projectedIdle, decimals),
     vaultTokens: toChartTokens(p.projectedVault, decimals),
     requiredTokens: toChartTokens(p.requiredReserve, decimals),
     paymentsTokens: toChartTokens(p.paymentsToday, decimals),
-    exact: { idle: p.projectedIdle, vault: p.projectedVault, required: p.requiredReserve, payments: p.paymentsToday },
+    exact: { idle: p.projectedIdle, vault: p.projectedVault, required: p.requiredReserve, payments: p.paymentsToday, withdrawals: p.withdrawalsToday },
   }));
+}
+
+/** UTC calendar day number of a chain timestamp; stable across refetches even though `date` moves with chain time. */
+export const utcDayKey = (t: number): number => Math.floor(t / SECONDS_PER_DAY);
+
+/**
+ * Rows whose UTC calendar day lies in [from, to] (day keys from utcDayKey, inclusive, either order). A bound that is
+ * null, or not one of the row days (e.g. after the projection length changed), falls back to the first / last row.
+ */
+export function chartRowsInRange(rows: readonly ChartRow[], from: number | null, to: number | null): ChartRow[] {
+  if (!rows.length) return [];
+  const has = (k: number | null): k is number => k !== null && rows.some((r) => utcDayKey(r.date) === k);
+  const a = has(from) ? from : utcDayKey(rows[0]!.date);
+  const b = has(to) ? to : utcDayKey(rows[rows.length - 1]!.date);
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  return rows.filter((r) => utcDayKey(r.date) >= lo && utcDayKey(r.date) <= hi);
+}
+
+// ---- client-side pagination (lists the API returns in one bounded response, e.g. agent activity) -------------
+
+export interface PageSlice<T> {
+  items: T[];
+  /** 1-based page actually shown (clamped into range). */
+  page: number;
+  pageCount: number;
+  /** 1-based positions of the first / last item shown; 0 / 0 when empty. */
+  from: number;
+  to: number;
+  total: number;
+}
+
+export function paginate<T>(list: readonly T[], page: number, pageSize: number): PageSlice<T> {
+  const total = list.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const p = Math.min(Math.max(1, Math.floor(page) || 1), pageCount);
+  const start = (p - 1) * pageSize;
+  const items = list.slice(start, start + pageSize);
+  return { items, page: p, pageCount, from: items.length ? start + 1 : 0, to: start + items.length, total };
 }
 
 // ---- unit conversions for forms (no floating point) -----------------------------------------------------------

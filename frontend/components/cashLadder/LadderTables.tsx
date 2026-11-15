@@ -1,4 +1,4 @@
-import { AddressChip, AmountText, EmptyState, StateChip } from '@/components/ui';
+import { AmountText, EmptyState, StateChip } from '@/components/ui';
 import type { CashLadderJson } from '@/lib/api';
 import { dayLabel } from '@/lib/dashboard';
 import { bpsToPercentText } from '@/lib/views';
@@ -43,7 +43,6 @@ export function WithdrawalScheduleTable({ items, demoStartTime }: { items: CashL
             <th className="px-4 py-2">Deadline</th>
             <th className="px-4 py-2 text-right">Amount</th>
             <th className="px-4 py-2">Covers</th>
-            <th className="px-4 py-2">Sources</th>
             <th className="px-4 py-2">State</th>
           </tr>
         </thead>
@@ -56,13 +55,6 @@ export function WithdrawalScheduleTable({ items, demoStartTime }: { items: CashL
               </td>
               <td className="px-4 py-2 text-xs">
                 {it.covers.map((c) => `#${c.obligationId} (occ. ${c.occurrenceIndex}, ${dayLabel(c.dueDate, demoStartTime)})`).join(', ')}
-              </td>
-              <td className="px-4 py-2 text-xs">
-                {it.suggestedSources.map((s) => (
-                  <span key={s.adapter} className="mr-2 inline-flex items-center gap-1">
-                    <AddressChip address={s.adapter} /> <AmountText value={s.amount} symbol={null} />
-                  </span>
-                ))}
               </td>
               <td className="px-4 py-2">
                 <StateChip state={it.state} />

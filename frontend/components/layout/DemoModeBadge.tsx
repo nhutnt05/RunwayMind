@@ -23,11 +23,12 @@ export function DemoModeIndicator({ day }: { day: number | null }) {
   return (
     <span
       data-testid="demo-mode-badge"
-      className="inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-amber-400 px-3 py-1 text-sm font-extrabold uppercase tracking-wide text-slate-950 shadow-sm ring-2 ring-amber-600"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-400 px-2 py-1 text-sm font-extrabold uppercase tracking-wide text-slate-950 shadow-sm ring-2 ring-amber-600 sm:gap-2 sm:px-3"
       title="Demo mode: time controls are enabled"
     >
       <span aria-hidden>⏱</span>
-      DEMO MODE
+      {/* Phones: compact "⏱ Day N" pill (text kept for screen readers) so the top bar fits 375 px. */}
+      <span className="sr-only sm:not-sr-only">DEMO MODE</span>
       {day !== null ? (
         <span className="rounded-full bg-slate-950 px-2 py-0.5 text-xs font-bold normal-case tracking-normal text-amber-300">
           Day {day}
@@ -37,39 +38,13 @@ export function DemoModeIndicator({ day }: { day: number | null }) {
   );
 }
 
-/** Full-width strip under the top bar (inside the sticky header, so it stays visible while scrolling). */
-export function DemoModeBannerView({ day }: { day: number | null }) {
-  return (
-    <div
-      role="status"
-      aria-label={`Demo mode${day !== null ? `, day ${day}` : ''}`}
-      data-testid="demo-mode-banner"
-      className="border-b-2 border-amber-600 bg-amber-300 text-slate-950"
-    >
-      <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-sm md:px-6">
-        <span className="font-extrabold uppercase tracking-wide">
-          <span aria-hidden>⏱ </span>Demo mode
-        </span>
-        {day !== null ? <span className="rounded bg-slate-950 px-2 py-0.5 font-bold text-amber-300">Day {day}</span> : null}
-        <span className="font-medium">Chain time is simulated — not available in production.</span>
-      </div>
-    </div>
-  );
-}
-
-/** TopBar badge: hidden on narrow screens, where the banner below carries the same information. */
+/** TopBar badge, shown at every width (the full-width demo strip was removed on 2026-11-14 at the team's request). */
 export function DemoModeBadge() {
   const { demoMode, day } = useDemoDay();
   if (!demoMode) return null;
   return (
-    <span className="hidden sm:inline-flex">
+    <span className="inline-flex">
       <DemoModeIndicator day={day} />
     </span>
   );
-}
-
-export function DemoModeBanner() {
-  const { demoMode, day } = useDemoDay();
-  if (!demoMode) return null;
-  return <DemoModeBannerView day={day} />;
 }

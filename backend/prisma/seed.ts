@@ -26,21 +26,17 @@ export function metadataHash(m: { label: string; notes: string | null; category:
 
 const NETWORK_BY_CHAIN: Record<number, string> = { 31337: 'local', 43113: 'fuji' };
 
-/** Circle USDC on Fuji (docs/02 §H real-USDC paragraph); real-USDC deployment files carry no MockUSDC address. */
-export const CIRCLE_USDC_FUJI = '0x5425890298aed601595a70AB815c96711a31Bc65';
-
 export interface SeedOptions {
   chainId: number;
   /** false → TreasuryConfig/Pool/AgentSettings only, no demo obligation labels (SEED_OBLIGATIONS=false). */
   seedObligations: boolean;
-  /** Asset of real-USDC deployments (no MockUSDC in the file). */
-  realUsdcAddress?: string;
   log?: (msg: string) => void;
 }
 
 /**
- * Registers every `deployment/*.json` of `opts.chainId` as a TreasuryConfig (D6-B1, docs/11 §7.2): the primary file
- * (`fuji.json`, no `-suffix`) → `fuji-musdc` with isPrimary=true; `fuji-usdc.json` → `fuji-usdc`, isPrimary=false.
+ * Registers every MockUSDC `deployment/*.json` of `opts.chainId` as a TreasuryConfig (D6-B1): the primary file
+ * (`fuji.json`, no `-suffix`) → `fuji-musdc` with isPrimary=true; a suffixed file (`fuji-<name>.json`) → `fuji-<name>`.
+ * Deployments without a MockUSDC address (the removed real-USDC treasury, DEC-USDC-1) are skipped.
  * Idempotent (upserts). Demo obligation labels are written for the primary treasury only.
  */
 export async function seedTreasuries(prisma: PrismaClient, deploymentDir: string, opts: SeedOptions): Promise<string[]> {
@@ -58,10 +54,15 @@ export async function seedTreasuries(prisma: PrismaClient, deploymentDir: string
       continue;
     }
     if (d.chainId !== opts.chainId) continue;
-    const primary = !file.replace(/\.json$/, '').includes('-');
-    const symbol = d.contracts.MockUSDC ? 'mUSDC' : 'USDC';
-    const asset = d.contracts.MockUSDC ?? opts.realUsdcAddress ?? CIRCLE_USDC_FUJI;
-    const id = `${NETWORK_BY_CHAIN[d.chainId] ?? d.chainId}-${symbol.toLowerCase()}`;
+    if (!d.contracts.MockUSDC) {
+      opts.log?.(`skip ${file}: no MockUSDC (only mUSDC treasuries are supported)`);
+      continue;
+    }
+    const name = file.replace(/\.json$/, '');
+    const primary = !name.includes('-');
+    const symbol = 'mUSDC';
+    const asset = d.contracts.MockUSDC;
+    const id = primary ? `${NETWORK_BY_CHAIN[d.chainId] ?? d.chainId}-musdc` : name;
     const fields = {
       chainId: d.chainId,
       treasuryAddress: d.contracts.Treasury,
@@ -120,7 +121,6 @@ async function main() {
   const seeded = await seedTreasuries(prisma, resolve(backendRoot, '..', 'deployment'), {
     chainId: Number(clean(process.env.CHAIN_ID) ?? 43113),
     seedObligations: process.env.SEED_OBLIGATIONS !== 'false',
-    ...(clean(process.env.CIRCLE_USDC_FUJI) ? { realUsdcAddress: clean(process.env.CIRCLE_USDC_FUJI)! } : {}),
     log: (m) => console.log(m),
   });
   if (seeded.length === 0) console.warn('No deployment file matched CHAIN_ID — nothing seeded.');

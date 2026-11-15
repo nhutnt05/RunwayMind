@@ -1,7 +1,7 @@
 // pnpm demo:reset [-- --no-seed] [--network fuji|local] [--verify] [--dry-run]   (docs/12 §1 pre-flight, §6, D6-B1)
 // Fresh demo in < 5 minutes: chain-id check → back up deployment/<network>.json → Deploy.s.sol → SeedDemo.s.sol
 // (SEED_OBLIGATIONS=false with --no-seed) → sync-abi → `prisma migrate reset --force` + seed (registers every
-// deployment/*.json of the chain, e.g. fuji.json + fuji-usdc.json) → restart instructions.
+// deployment/*.json of the chain, e.g. fuji.json) → restart instructions.
 // Keys come only from .env (rule 7) and are never printed: secret arguments are redacted in the step log.
 // The command runner, chain-id lookup, filesystem and clock are injectable (unit-tested in backend/test/demoReset.test.ts).
 import { spawn } from 'node:child_process';

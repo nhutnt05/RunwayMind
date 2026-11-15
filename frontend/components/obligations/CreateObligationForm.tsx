@@ -32,7 +32,16 @@ function FieldError({ id, message }: { id: string; message?: string }) {
  * docs/08 §3.3 CreateObligationForm. Submit → `POST /obligations` (prepare + simulation) → wallet sign →
  * `POST /transactions` → receipt → invalidate (see useRegistryWrite).
  */
-export function CreateObligationForm({ chainTime, gate }: { chainTime: number | null; gate: AdminGate }) {
+export function CreateObligationForm({
+  chainTime,
+  gate,
+  onCreated,
+}: {
+  chainTime: number | null;
+  gate: AdminGate;
+  /** Called after the creation is confirmed on-chain (label of the new obligation). */
+  onCreated?: (label: string) => void;
+}) {
   const schema = useMemo(() => createObligationFormSchema({ chainTime }), [chainTime]);
   const write = useRegistryWrite();
   const {
@@ -54,6 +63,7 @@ export function CreateObligationForm({ chainTime, gate }: { chainTime: number | 
       prepare: () => api.postValidated<typeof CreateObligationRequestSchema, PrepareTxResponse>('/obligations', CreateObligationRequestSchema, request),
     });
     reset(DEFAULT_OBLIGATION_FORM);
+    onCreated?.(request.label);
   }
 
   const busy = isSubmitting || write.isPending;

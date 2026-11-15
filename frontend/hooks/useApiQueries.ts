@@ -1,90 +1,57 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import {
-  api,
-  type AgentSettingsJson,
-  type CashLadderJson,
-  type KeeperStatusJson,
-  type ObligationItem,
-  type TransactionItemJson,
-  type TreasuryOverview,
-  type WithdrawalScheduleJson,
-} from '@/lib/api';
+  AGENT_ACTIVITY_LIMIT,
+  agentActivityQuery,
+  agentSettingsQuery,
+  cashLadderQuery,
+  keeperStatusQuery,
+  obligationsQuery,
+  overviewQuery,
+  transactionsQuery,
+  withdrawalScheduleQuery,
+  type TransactionFilters,
+} from '@/lib/queries';
 import type { Address, PoolRiskBand, RiskClass } from '@runwaymind/shared';
 import type { ScenarioJson } from '@/lib/insights';
-import type { ActivityItemJson } from '@/lib/views';
 
 // docs/08 §5: dashboard data refreshes every 5 s.
 const DASHBOARD_REFRESH_MS = 5_000;
 
 export function useOverview() {
-  return useQuery({
-    queryKey: ['overview'],
-    queryFn: () => api.get<TreasuryOverview>('/treasury/overview'),
-    refetchInterval: DASHBOARD_REFRESH_MS,
-  });
+  return useQuery({ ...overviewQuery(), refetchInterval: DASHBOARD_REFRESH_MS });
 }
 
 export function useActiveObligations() {
-  return useQuery({
-    queryKey: ['obligations', 'ACTIVE'],
-    queryFn: () => api.get<ObligationItem[]>('/obligations?status=ACTIVE'),
-    refetchInterval: DASHBOARD_REFRESH_MS,
-  });
+  return useQuery({ ...obligationsQuery('ACTIVE'), refetchInterval: DASHBOARD_REFRESH_MS });
 }
 
 export function useWithdrawalSchedule() {
-  return useQuery({
-    queryKey: ['cash-ladder', 'withdrawal-schedule'],
-    queryFn: () => api.get<WithdrawalScheduleJson>('/cash-ladder/withdrawal-schedule'),
-    refetchInterval: DASHBOARD_REFRESH_MS,
-  });
+  return useQuery({ ...withdrawalScheduleQuery(), refetchInterval: DASHBOARD_REFRESH_MS });
 }
 
 // ---- D4 pages (docs/08 §3.4, §3.8–§3.10) ---------------------------------------------------------------------------
 
 export function useCashLadder(projectionDays: number, includeYield: boolean) {
-  return useQuery({
-    queryKey: ['cash-ladder', projectionDays, includeYield],
-    queryFn: () => api.get<CashLadderJson>(`/cash-ladder?projectionDays=${projectionDays}&includeYield=${includeYield}`),
-    refetchInterval: DASHBOARD_REFRESH_MS,
-  });
+  return useQuery({ ...cashLadderQuery(projectionDays, includeYield), refetchInterval: DASHBOARD_REFRESH_MS });
 }
 
-export function useTransactions(filters: { kind?: string; status?: string; cursor?: string | null; limit?: number }) {
-  const qs = new URLSearchParams({ limit: String(filters.limit ?? 20) });
-  if (filters.kind) qs.set('kind', filters.kind);
-  if (filters.status) qs.set('status', filters.status);
-  if (filters.cursor) qs.set('cursor', filters.cursor);
-  return useQuery({
-    queryKey: ['transactions', filters],
-    queryFn: () => api.get<TransactionItemJson[]>(`/transactions?${qs.toString()}`),
-    refetchInterval: 10_000,
-  });
+export function useTransactions(filters: TransactionFilters) {
+  return useQuery({ ...transactionsQuery(filters), refetchInterval: 10_000 });
 }
 
-export function useAgentActivity(limit = 50) {
-  return useQuery({
-    queryKey: ['agent', 'activity', limit],
-    queryFn: () => api.get<ActivityItemJson[]>(`/agent/activity?limit=${limit}`),
-    refetchInterval: DASHBOARD_REFRESH_MS,
-  });
+export function useAgentActivity(limit = AGENT_ACTIVITY_LIMIT) {
+  return useQuery({ ...agentActivityQuery(limit), refetchInterval: DASHBOARD_REFRESH_MS });
 }
 
 export function useKeeperStatus() {
-  return useQuery({
-    queryKey: ['keeper', 'status'],
-    queryFn: () => api.get<KeeperStatusJson>('/keeper/status'),
-    refetchInterval: DASHBOARD_REFRESH_MS,
-  });
+  return useQuery({ ...keeperStatusQuery(), refetchInterval: DASHBOARD_REFRESH_MS });
 }
 
 export function useAgentSettings() {
-  return useQuery({
-    queryKey: ['agent', 'settings'],
-    queryFn: () => api.get<AgentSettingsJson>('/agent/settings'),
-  });
+  return useQuery(agentSettingsQuery());
 }
 
 // ---- D5 (docs/08 §2, §3.6, §3.7) -------------------------------------------------------------------------------------
@@ -132,12 +99,20 @@ export interface InflowJson {
   expectedDate: number;
 }
 
+export const runwayQuery = () => ({ queryKey: ['runway'] as const, queryFn: () => api.get<RunwayJson>('/runway') });
+export const poolsQuery = () => ({ queryKey: ['pools'] as const, queryFn: () => api.get<PoolJson[]>('/pools') });
+export const latestStressTestQuery = () => ({
+  queryKey: ['stress-tests', 'latest'] as const,
+  queryFn: async () => (await api.get<StressTestJson[]>('/stress-tests?limit=1')).data[0] ?? null,
+});
+export const inflowsQuery = () => ({ queryKey: ['inflows'] as const, queryFn: () => api.get<InflowJson[]>('/inflows') });
+
 export function useRunway() {
-  return useQuery({ queryKey: ['runway'], queryFn: () => api.get<RunwayJson>('/runway'), refetchInterval: DASHBOARD_REFRESH_MS });
+  return useQuery({ ...runwayQuery(), refetchInterval: DASHBOARD_REFRESH_MS });
 }
 
 export function usePools() {
-  return useQuery({ queryKey: ['pools'], queryFn: () => api.get<PoolJson[]>('/pools'), refetchInterval: 10_000 });
+  return useQuery({ ...poolsQuery(), refetchInterval: 10_000 });
 }
 
 export function usePool(adapter: string) {
@@ -145,12 +120,9 @@ export function usePool(adapter: string) {
 }
 
 export function useLatestStressTest() {
-  return useQuery({
-    queryKey: ['stress-tests', 'latest'],
-    queryFn: async () => (await api.get<StressTestJson[]>('/stress-tests?limit=1')).data[0] ?? null,
-  });
+  return useQuery(latestStressTestQuery());
 }
 
 export function useInflows() {
-  return useQuery({ queryKey: ['inflows'], queryFn: () => api.get<InflowJson[]>('/inflows') });
+  return useQuery(inflowsQuery());
 }
