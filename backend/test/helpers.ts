@@ -5,7 +5,7 @@ import { createSiweMessage } from 'viem/siwe';
 import type { ChainSnapshot, ObligationOnChain } from '@runwaymind/shared';
 import { buildApp, type AppDeps } from '../src/app';
 import { ApiError } from '../src/errors';
-import type { ChainService, OnchainRole, ReceiptView, SimulationCall, SimulationResult } from '../src/services/chain';
+import { ADAPTER_PROBE_FUNCTIONS, type AdapterProbe, type ChainService, type OnchainRole, type ReceiptView, type SimulationCall, type SimulationResult } from '../src/services/chain';
 
 export const DAY = 86_400;
 export const T0 = 1_793_318_400;
@@ -105,6 +105,12 @@ export class FakeChain implements ChainService {
     this.check();
     this.simulations.push({ account, call });
     return this.simulation;
+  }
+  /** Candidate adapters for probeAdapter (lower-case address → probe); unknown addresses implement nothing. */
+  probes = new Map<string, AdapterProbe>();
+  async probeAdapter(adapter: Address): Promise<AdapterProbe> {
+    this.check();
+    return this.probes.get(adapter.toLowerCase()) ?? { name: null, asset: null, treasury: null, missing: [...ADAPTER_PROBE_FUNCTIONS] };
   }
   async waitForReceipt(hash: Hex) {
     return this.receipts.get(hash.toLowerCase()) ?? null;

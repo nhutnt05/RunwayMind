@@ -2,9 +2,9 @@
 
 import { ErrorState, RISK_STYLE, RiskBadge, SkeletonCard } from '@/components/ui';
 import { useRunway } from '@/hooks/useApiQueries';
-import { CLASS_COLOR, runwayFraction, runwayLabel, worstCaseLine } from '@/lib/insights';
+import { CLASS_COLOR, runwayFraction, runwayLabel } from '@/lib/insights';
 
-/** Radial gauge 0–365+ days, colored by class, worst stress-scenario runway underneath (docs/06 §2.3, docs/08 §2). */
+/** Radial gauge 0–365+ days, colored by class (docs/06 §2.3, docs/08 §2). */
 export function RunwayMeter() {
   const q = useRunway();
   const r = q.data?.data;
@@ -20,7 +20,6 @@ export function RunwayMeter() {
   const f = runwayFraction(r.baseline.capped ? 365 : r.baseline.runwayDays);
   // Semicircle from (10,60) to (110,60), radius 50; arc length = π·50.
   const arc = Math.PI * 50;
-  const worst = worstCaseLine(r.worstCase);
   return (
     <section aria-label="Runway meter" className="h-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
@@ -36,7 +35,6 @@ export function RunwayMeter() {
         </text>
       </svg>
       <p className={`text-center text-xs font-semibold ${RISK_STYLE[cls].text}`}>{RISK_STYLE[cls].description} runway</p>
-      <p className="mt-1 text-center text-xs text-slate-600">{worst ?? 'Run a stress test to see the worst case'}</p>
     </section>
   );
 }

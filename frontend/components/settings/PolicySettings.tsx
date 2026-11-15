@@ -5,6 +5,7 @@ import { useReadContracts } from 'wagmi';
 import { keccak256, toBytes, type Address } from 'viem';
 import { parseUsdc, type PolicyPrepareRequest } from '@runwaymind/shared';
 import { AddressChip, AmountText, GatedButton, StateChip } from '@/components/ui';
+import { AddAdapterForm } from '@/components/settings/AddAdapterForm';
 import { useAdminWrite } from '@/hooks/useAdminWrite';
 import { api, type AdminPrepareResponse, type TreasuryOverview } from '@/lib/api';
 import { appChain } from '@/lib/chains';
@@ -168,6 +169,7 @@ export function AdapterWhitelistTable({ overview, gate }: { overview: TreasuryOv
           {error}
         </p>
       ) : null}
+      <AddAdapterForm overview={overview} gate={gate} />
     </section>
   );
 }
@@ -211,7 +213,6 @@ export function RolesPanel() {
           );
         })}
       </ul>
-      <p className="mt-2 text-xs text-slate-600">Keeper has no role: anyone may call pay() and enforceDeadlines().</p>
     </section>
   );
 }

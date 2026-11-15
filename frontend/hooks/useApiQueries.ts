@@ -82,30 +82,8 @@ export interface PoolDetailJson extends PoolJson {
   riskHistory: { computedAt: number; score: number; band: PoolRiskBand }[];
 }
 
-export interface StressTestJson {
-  id: string;
-  ranAt: number;
-  baseline: ScenarioJson;
-  scenarios: ScenarioJson[];
-  worstCase: string;
-  overallClassification: RiskClass;
-  createdAt: number;
-}
-
-export interface InflowJson {
-  id: string;
-  label: string;
-  amount: string;
-  expectedDate: number;
-}
-
 export const runwayQuery = () => ({ queryKey: ['runway'] as const, queryFn: () => api.get<RunwayJson>('/runway') });
 export const poolsQuery = () => ({ queryKey: ['pools'] as const, queryFn: () => api.get<PoolJson[]>('/pools') });
-export const latestStressTestQuery = () => ({
-  queryKey: ['stress-tests', 'latest'] as const,
-  queryFn: async () => (await api.get<StressTestJson[]>('/stress-tests?limit=1')).data[0] ?? null,
-});
-export const inflowsQuery = () => ({ queryKey: ['inflows'] as const, queryFn: () => api.get<InflowJson[]>('/inflows') });
 
 export function useRunway() {
   return useQuery({ ...runwayQuery(), refetchInterval: DASHBOARD_REFRESH_MS });
@@ -119,10 +97,3 @@ export function usePool(adapter: string) {
   return useQuery({ queryKey: ['pools', adapter], queryFn: () => api.get<PoolDetailJson>(`/pools/${adapter}`), refetchInterval: 10_000 });
 }
 
-export function useLatestStressTest() {
-  return useQuery(latestStressTestQuery());
-}
-
-export function useInflows() {
-  return useQuery(inflowsQuery());
-}

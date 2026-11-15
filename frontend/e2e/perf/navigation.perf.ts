@@ -13,13 +13,12 @@ const HEADINGS: Record<string, string> = {
   '/cash-ladder': 'Cash Ladder',
   '/vault': 'Yield Vault',
   '/pools': 'Pool Risk Dashboard',
-  '/stress-test': 'Stress Test',
   '/agent': 'AI Agent Activity',
   '/transactions': 'Transactions',
   '/settings': 'Settings & Policy Configuration',
 };
 const PATH = ['/treasury', '/obligations', '/transactions', '/settings'];
-const LOOP = ['/', '/treasury', '/obligations', '/cash-ladder', '/vault', '/pools', '/stress-test', '/agent', '/transactions', '/settings'];
+const LOOP = ['/', '/treasury', '/obligations', '/cash-ladder', '/vault', '/pools', '/agent', '/transactions', '/settings'];
 const RUNS = Number(process.env.PERF_RUNS ?? 5);
 const SLOW_RUNS = Number(process.env.PERF_SLOW_RUNS ?? 3);
 const API_DELAY_MS = 2_500;

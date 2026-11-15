@@ -77,3 +77,16 @@ describe('wallet errors shown in the UI are redacted', () => {
     expect(msg).not.toContain('SECRETKEY');
   });
 });
+
+describe('toast auto-dismiss timing', () => {
+  it('errors close after 5 s, confirmed/dropped after 15 s, in-flight toasts stay', async () => {
+    const { autoDismissDelay, TOAST_DISMISS_MS } = await import('../lib/txTracker');
+    expect(TOAST_DISMISS_MS.error).toBe(5_000);
+    expect(autoDismissDelay({ status: 'FAILED', updatedAt: 1_000 }, 1_000)).toBe(5_000);
+    expect(autoDismissDelay({ status: 'REVERTED', updatedAt: 1_000 }, 4_000)).toBe(2_000);
+    expect(autoDismissDelay({ status: 'FAILED', updatedAt: 1_000 }, 99_000)).toBe(0);
+    expect(autoDismissDelay({ status: 'CONFIRMED', updatedAt: 0 }, 0)).toBe(15_000);
+    expect(autoDismissDelay({ status: 'DROPPED', updatedAt: 0 }, 5_000)).toBe(10_000);
+    expect(autoDismissDelay({ status: 'PENDING', updatedAt: 0 }, 60_000)).toBeNull();
+  });
+});

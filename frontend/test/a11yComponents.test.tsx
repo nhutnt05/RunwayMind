@@ -147,17 +147,18 @@ describe('loading, empty and error states (docs/08 §8)', () => {
   });
 });
 
-describe('DEMO MODE · Day N badge (video visibility)', () => {
-  it('badge shows DEMO MODE and the Day N chip in large, high-contrast type', () => {
-    const out = html(<DemoModeIndicator day={12} />);
+describe('DEMO MODE · DD/MM/YY badge (video visibility)', () => {
+  it('badge shows DEMO MODE and the chain date (DD/MM/YY, UTC) in large, high-contrast type', () => {
+    const out = html(<DemoModeIndicator chainTime={Date.UTC(2026, 10, 25, 23, 30) / 1000} />);
     expect(out).toContain('DEMO MODE');
-    expect(out).toContain('>Day 12<');
+    expect(out).toMatch(/chain date <\/span>25\/11\/26</);
+    expect(out).not.toContain('Day ');
     expect(out).toContain('text-slate-950');
     expect(out).toContain('bg-amber-400');
     expect(out).toContain('text-sm');
   });
 
-  it('badge omits the day when demoStartTime is unknown', () => {
-    expect(html(<DemoModeIndicator day={null} />)).not.toContain('Day');
+  it('badge omits the date while chain time is unknown', () => {
+    expect(html(<DemoModeIndicator chainTime={null} />)).not.toMatch(/\d{2}\/\d{2}\/\d{2}/);
   });
 });

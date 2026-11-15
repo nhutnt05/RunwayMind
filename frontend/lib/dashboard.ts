@@ -12,7 +12,7 @@ export function dayIndex(t: number, t0: number | null | undefined): number | nul
 /**
  * Calendar date of a chain timestamp as DD/MM/YY (UTC, like every other chain time in the UI).
  * Replaces the earlier "Day N" label so users see a real date; `_t0` is kept so existing call sites stay unchanged.
- * The DEMO MODE badge still shows "Day N" via dayIndex.
+ * The DEMO MODE badge uses it too (chain date in DD/MM/YY).
  */
 export function dayLabel(t: number, _t0?: number | null): string {
   const d = new Date(t * 1000);

@@ -157,6 +157,54 @@ describe('policy & demo helpers (docs/07 §5.7)', () => {
     expect(decode(policyEngineAbi, e.data).args).toEqual([5000]);
   });
 
+  it('adding a NEW adapter: probed first (IVaultAdapter views, same asset, withdraws to this Treasury, list not full)', async () => {
+    const { post, chain } = await setup();
+    const NEW = '0x00000000000000000000000000000000000000A2' as Address;
+    const ASSET = chain.snapshot.asset;
+    const ok = { name: 'Second Pool', asset: ASSET, treasury: TREASURY, missing: [] as string[] };
+    const add = () => post('/policy/prepare', { fn: 'setAdapterStatus', args: [NEW, 'ACTIVE'] });
+
+    // Unknown contract / EOA: implements nothing → 400, nothing simulated.
+    let res = await add();
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.message).toMatch(/not a compatible vault adapter.*asset.*tvl/);
+    expect(chain.simulations).toHaveLength(0);
+
+    chain.probes.set(NEW.toLowerCase(), { ...ok, missing: ['tvl'] });
+    expect((await add()).json().error.message).toMatch(/missing or failing: tvl/);
+
+    chain.probes.set(NEW.toLowerCase(), { ...ok, asset: '0x00000000000000000000000000000000000000F9' });
+    expect((await add()).json().error.message).toMatch(/is not the Treasury asset/);
+
+    chain.probes.set(NEW.toLowerCase(), { ...ok, treasury: '0x00000000000000000000000000000000000000E1' });
+    expect((await add()).json().error.message).toMatch(/not to this Treasury/);
+    expect(chain.simulations).toHaveLength(0);
+
+    // Compatible → prepared + simulated like any other setter.
+    chain.probes.set(NEW.toLowerCase(), ok);
+    res = await add();
+    expect(res.statusCode).toBe(200);
+    expect(decode(policyEngineAbi, res.json().data.preparedTx.data)).toMatchObject({ functionName: 'setAdapterStatus', args: [NEW, 1] });
+    expect(chain.simulations).toHaveLength(1);
+
+    // Full whitelist (PolicyEngine.MAX_ADAPTERS = 5) → 409 before probing.
+    const base = chain.snapshot.adapters[0]!;
+    chain.snapshot = {
+      ...chain.snapshot,
+      adapters: [1, 2, 3, 4, 5].map((i) => ({ ...base, address: `0x00000000000000000000000000000000000000B${i}` as Address })),
+    };
+    res = await add();
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.message).toMatch(/whitelist is full/);
+  });
+
+  it('status change of an already-listed adapter is not probed; removal (NONE) is not probed', async () => {
+    const { post, chain } = await setup();
+    expect((await post('/policy/prepare', { fn: 'setAdapterStatus', args: [ADAPTER, 'ACTIVE'] })).statusCode).toBe(200);
+    expect((await post('/policy/prepare', { fn: 'setAdapterStatus', args: ['0x00000000000000000000000000000000000000C7', 'NONE'] })).statusCode).toBe(200);
+    expect(chain.simulations).toHaveLength(2);
+  });
+
   it('policy simulation revert is returned (not thrown) like other prepared txs', async () => {
     const { post, chain } = await setup();
     chain.simulation = { ok: false, error: { name: 'InvalidParameter', args: { name: 'safetyHorizon' } }, message: 'reverted' };

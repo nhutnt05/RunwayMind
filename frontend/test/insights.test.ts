@@ -5,12 +5,9 @@ import {
   draftToCreateRequest,
   runwayFraction,
   runwayLabel,
-  scenarioKeyNumber,
   tickAccruedYield,
   weightedApyBps,
-  worstCaseLine,
   type DraftJson,
-  type ScenarioJson,
 } from '../lib/insights';
 
 const USDC = (n: number) => BigInt(n) * 1_000_000n;
@@ -21,8 +18,6 @@ describe('runway meter helpers', () => {
     expect(runwayLabel({ runwayDays: 97, capped: false })).toBe('97 days');
     expect(runwayFraction(97)).toBeCloseTo(97 / 365);
     expect(runwayFraction(900)).toBe(1);
-    expect(worstCaseLine({ id: 'INFLOW_DELAY_30D', runwayDays: 37 })).toBe('Worst case: 37 days — Inflows delayed 30 days');
-    expect(worstCaseLine(null)).toBeNull();
   });
 });
 
@@ -38,25 +33,6 @@ describe('accrued yield ticker', () => {
   it('weighted APY across adapters', () => {
     expect(weightedApyBps([{ balance: '70000000000', apyBps: 800 }, { balance: '30000000000', apyBps: 400 }])).toBe(680);
     expect(weightedApyBps([])).toBe(0);
-  });
-});
-
-describe('scenario key number', () => {
-  const base: ScenarioJson = {
-    id: 'APY_DROP_50',
-    label: 'APY −50%',
-    parameters: {},
-    runway: { runwayDays: 365, capped: true, classification: 'SAFE', shortfallNow: '0', minLiquidIdle: '10000000000', projectedYield: '266300000', failure: null },
-    deltaRunwayDays: 0,
-    recommendedAction: { action: 'NONE', amount: null, note: '' },
-  };
-  it('picks failure > shortfall > min idle (pool lock) > yield', () => {
-    expect(scenarioKeyNumber(base)).toBe('Projected yield 266.30 USDC');
-    expect(scenarioKeyNumber({ ...base, id: 'POOL_LOCK_14D' })).toBe('Min idle 10,000.00 USDC');
-    expect(scenarioKeyNumber({ ...base, runway: { ...base.runway, shortfallNow: '4000000000' } })).toBe('Shortfall now 4,000.00 USDC');
-    expect(scenarioKeyNumber({ ...base, runway: { ...base.runway, failure: { at: 1, kind: 'SOLVENCY', obligationId: '1', missing: '20000000000' } } })).toBe(
-      'Fails: missing 20,000.00 USDC',
-    );
   });
 });
 

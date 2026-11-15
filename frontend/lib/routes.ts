@@ -1,4 +1,4 @@
-// The 10 routes of docs/08 §1, in navigation order.
+// The routes of docs/08 §1, in navigation order.
 export interface AppRoute {
   href: string;
   label: string;
@@ -12,7 +12,6 @@ export const APP_ROUTES: readonly AppRoute[] = [
   { href: '/cash-ladder', label: 'Cash Ladder', priority: 'MUST' },
   { href: '/vault', label: 'Yield Vault', priority: 'MUST' },
   { href: '/pools', label: 'Pool Risk Dashboard', priority: 'COULD' },
-  { href: '/stress-test', label: 'Stress Test', priority: 'COULD' },
   { href: '/agent', label: 'AI Agent Activity', priority: 'MUST' },
   { href: '/transactions', label: 'Transaction History', priority: 'MUST' },
   { href: '/settings', label: 'Settings & Policy Configuration', priority: 'MUST' },

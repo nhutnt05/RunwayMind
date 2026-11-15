@@ -1,6 +1,6 @@
 // Chain access for services (docs/07 §1, §6). Routes never call viem directly; tests inject a fake ChainService.
 import type { Abi, Address, Hex, Log, PublicClient } from 'viem';
-import { obligationRegistryAbi, treasuryAbi } from '@runwaymind/shared/abi';
+import { obligationRegistryAbi, treasuryAbi, vaultAdapterAbi } from '@runwaymind/shared/abi';
 import type { ChainSnapshot, ObligationOnChain } from '@runwaymind/shared';
 import { readSnapshot, simulateCall, toObligation, type CoreAddresses, type DecodedError } from '@runwaymind/agent';
 import { chainUnavailable } from '../errors';
@@ -24,6 +24,21 @@ export interface ReceiptView {
   logs: readonly Log[];
 }
 
+/**
+ * Result of reading a candidate adapter before it is whitelisted. `missing` lists IVaultAdapter views that reverted
+ * or do not exist: the agent's snapshot reads all of them for every listed adapter, so one broken adapter would
+ * break every page.
+ */
+export interface AdapterProbe {
+  name: string | null;
+  asset: Address | null;
+  treasury: Address | null;
+  missing: string[];
+}
+
+/** Views the snapshot reader (agent/src/chain/reader.ts) and the policy checks call on every listed adapter. */
+export const ADAPTER_PROBE_FUNCTIONS = ['asset', 'treasury', 'name', 'balance', 'getAPY', 'isPaused', 'availableLiquidity', 'utilizationBps', 'tvl'] as const;
+
 export interface ChainService {
   readonly addresses: CoreAddresses;
   getSnapshot(): Promise<ChainSnapshot>;
@@ -36,6 +51,8 @@ export interface ChainService {
   simulate(account: Address, call: SimulationCall): Promise<SimulationResult>;
   /** Waits for 1 confirmation; null on timeout (the indexer still picks the tx up later). */
   waitForReceipt(hash: Hex, timeoutMs?: number): Promise<ReceiptView | null>;
+  /** Reads the IVaultAdapter views of a not-yet-listed address (see AdapterProbe). */
+  probeAdapter(adapter: Address): Promise<AdapterProbe>;
 }
 
 const DEFAULT_ADMIN_ROLE: Hex = `0x${'0'.repeat(64)}`;
@@ -150,6 +167,26 @@ export class ViemChainService implements ChainService {
 
   verifySiweMessage(message: string, signature: Hex): Promise<boolean> {
     return guard(() => this.client.verifySiweMessage({ message, signature }));
+  }
+
+  async probeAdapter(adapter: Address): Promise<AdapterProbe> {
+    const results = await guard(() =>
+      this.client.multicall({
+        allowFailure: true,
+        contracts: ADAPTER_PROBE_FUNCTIONS.map((functionName) => ({ address: adapter, abi: vaultAdapterAbi, functionName })),
+      }),
+    );
+    const missing = ADAPTER_PROBE_FUNCTIONS.filter((_, i) => results[i]!.status !== 'success');
+    const value = (fn: (typeof ADAPTER_PROBE_FUNCTIONS)[number]) => {
+      const r = results[ADAPTER_PROBE_FUNCTIONS.indexOf(fn)]!;
+      return r.status === 'success' ? r.result : null;
+    };
+    return {
+      name: (value('name') as string | null) ?? null,
+      asset: (value('asset') as Address | null) ?? null,
+      treasury: (value('treasury') as Address | null) ?? null,
+      missing: [...missing],
+    };
   }
 
   async simulate(account: Address, call: SimulationCall): Promise<SimulationResult> {

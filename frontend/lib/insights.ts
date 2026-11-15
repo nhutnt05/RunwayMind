@@ -1,5 +1,5 @@
-// Pure helpers for the D5 UI (docs/08 §2 RunwayMeter / AccruedYieldTicker, §3.3 NL drafts, §3.6 pools, §3.7 stress).
-import { formatUsdc, toUtcMidnight, type CreateObligationRequest, type RiskClass } from '@runwaymind/shared';
+// Pure helpers for the D5 UI (docs/08 §2 RunwayMeter / AccruedYieldTicker, §3.3 NL drafts, §3.6 pools).
+import { toUtcMidnight, type CreateObligationRequest, type RiskClass } from '@runwaymind/shared';
 
 // ---- Runway Meter (docs/06 §2.3) --------------------------------------------------------------------------------
 
@@ -15,20 +15,6 @@ export function runwayFraction(days: number): number {
 }
 
 export const CLASS_COLOR: Record<RiskClass, string> = { SAFE: '#059669', WATCH: '#d97706', CRITICAL: '#dc2626' };
-
-export const SCENARIO_LABEL: Record<string, string> = {
-  BASELINE: 'Baseline',
-  APY_DROP_50: 'APY −50%',
-  POOL_LOCK_14D: 'Pool locked 14 days',
-  INFLOW_DELAY_30D: 'Inflows delayed 30 days',
-  EXPENSE_PLUS_20: 'Expenses +20%',
-};
-
-/** "Worst case: 37 days — Inflows delayed 30 days" (docs/06 §2.3). */
-export function worstCaseLine(w: { id: string; runwayDays: number } | null): string | null {
-  if (!w) return null;
-  return `Worst case: ${runwayLabel({ runwayDays: w.runwayDays, capped: w.runwayDays >= RUNWAY_CAP_DAYS })} — ${SCENARIO_LABEL[w.id] ?? w.id}`;
-}
 
 // ---- Accrued yield ticker (docs/08 §2) --------------------------------------------------------------------------
 
@@ -50,7 +36,7 @@ export function weightedApyBps(adapters: readonly { balance: string; apyBps: num
   return Number(adapters.reduce((s, a) => s + BigInt(a.balance) * BigInt(a.apyBps), 0n) / total);
 }
 
-// ---- stress scenarios (docs/06 §3.5) ----------------------------------------------------------------------------
+// ---- runway scenario shape (GET /runway baseline, docs/06 §3.5) ---------------------------------------------------
 
 export interface ScenarioJson {
   id: string;
@@ -67,15 +53,6 @@ export interface ScenarioJson {
   };
   deltaRunwayDays: number;
   recommendedAction: { action: 'NONE' | 'WITHDRAW' | 'HOLD' | 'REVIEW_POLICY'; amount: string | null; note: string };
-}
-
-/** The single number each ScenarioCard highlights (docs/06 §3.5 "Key number"). */
-export function scenarioKeyNumber(s: ScenarioJson): string {
-  const usd = (v: string) => `${formatUsdc(BigInt(v))} USDC`;
-  if (s.runway.failure) return `Fails: missing ${usd(s.runway.failure.missing)}`;
-  if (BigInt(s.runway.shortfallNow) > 0n) return `Shortfall now ${usd(s.runway.shortfallNow)}`;
-  if (s.id === 'POOL_LOCK_14D') return `Min idle ${usd(s.runway.minLiquidIdle)}`;
-  return `Projected yield ${usd(s.runway.projectedYield)}`;
 }
 
 // ---- NL drafts (docs/07 §5.4) -----------------------------------------------------------------------------------

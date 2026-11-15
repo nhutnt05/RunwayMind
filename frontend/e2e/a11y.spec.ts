@@ -44,11 +44,12 @@ test('a11y: every route fits 375 px without horizontal page scroll', async ({ pa
   }
 });
 
-test('a11y: DEMO MODE · Day N badge is visible on load and a skip link reaches main content', async ({ page }) => {
+test('a11y: DEMO MODE · DD/MM/YY badge is visible on load and a skip link reaches main content', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('demo-mode-badge')).toBeVisible();
   await expect(page.getByTestId('demo-mode-badge')).toContainText(/Demo mode/i);
-  await expect(page.getByTestId('demo-mode-badge')).toContainText(/Day \d+/);
+  await expect(page.getByTestId('demo-mode-badge')).toContainText(/\d{2}\/\d{2}\/\d{2}/);
+  await expect(page.getByTestId('demo-mode-badge')).not.toContainText(/Day \d+/);
   await expect(page.getByText('Chain time is simulated')).toHaveCount(0);
   await page.keyboard.press('Tab');
   const skip = page.getByRole('link', { name: 'Skip to main content' });
@@ -231,4 +232,43 @@ test('agent activity: paginated 10 per page; filter resets to page 1 (mocked lis
   await expect(pager.getByTestId('activity-range')).toHaveText('1–10 of 11');
   await expect(pager).toContainText('Page 1 of 2');
   expect(await axeViolations(page)).toEqual([]);
+});
+
+test('settings: Add adapter checks the address on-chain before it can be signed (Anvil E2E deployment)', async ({ page }) => {
+  const ADAPTER = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6'; // the listed VaultAdapter
+  const MOCK_USDC = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // a real contract that is not an adapter
+  await page.goto('/settings');
+  await waitForSettled(page);
+  // Hidden until opened.
+  const form = page.getByRole('form', { name: 'Add adapter' });
+  await expect(form).toHaveCount(0);
+  const opener = page.getByRole('button', { name: 'Add adapter' });
+  await expect(opener).toHaveAttribute('aria-expanded', 'false');
+  await opener.click();
+  await expect(form).toBeVisible();
+  await expect(form.getByLabel('Adapter address')).toBeFocused();
+  const input = form.getByLabel('Adapter address');
+  const check = form.getByTestId('add-adapter-check');
+  const add = form.getByRole('button', { name: 'Add adapter' });
+  await expect(form).toContainText('1 of 5 used');
+  await expect(add).toBeDisabled();
+
+  await input.fill('0x1234');
+  await expect(check).toContainText('0x followed by 40 hex characters');
+  await input.fill(ADAPTER.toLowerCase());
+  await expect(check).toContainText('already in the whitelist');
+  await input.fill(MOCK_USDC);
+  await expect(check).toContainText('Not a complete vault adapter', { timeout: 15_000 });
+  await expect(check).toContainText('treasury');
+  await input.fill('0x000000000000000000000000000000000000dEaD');
+  await expect(check).toContainText('No vault adapter found', { timeout: 15_000 });
+  await expect(add).toBeDisabled();
+  await expect(input).toHaveAttribute('aria-invalid', 'true');
+  expect(await axeViolations(page)).toEqual([]);
+
+  // Cancel closes and clears; reopening starts empty.
+  await form.getByRole('button', { name: 'Cancel' }).click();
+  await expect(form).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add adapter' }).click();
+  await expect(page.getByRole('form', { name: 'Add adapter' }).getByLabel('Adapter address')).toHaveValue('');
 });

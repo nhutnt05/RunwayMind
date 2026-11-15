@@ -246,6 +246,7 @@ test('reverted call shows the decoded error: invest 90,000 → Blocked by R1 Res
   await card.getByLabel('Amount (USDC)').fill('90000');
   await card.getByRole('button', { name: 'Confirm' }).click();
   await expect(card.getByRole('alert')).toContainText('Blocked by R1 Reserve Ratio: idle after 10,000.00 < required 30,000.00');
+
 });
 
 test('approval flow: evaluate → pending INVEST 70,000 → Approve → EXECUTED with Snowtrace link', async () => {
@@ -301,6 +302,55 @@ test('agent mode: custom dialog (no native confirm); Esc and "Stay in APPROVE" s
   } finally {
     page.off('dialog', onNative);
     page.off('request', onRequest);
+  }
+});
+
+test('error toast (mocked rejected prepare): closes after ~5 s, stays while hovered, ✕ closes at once', async () => {
+  await page.goto('/settings');
+  await signIn();
+  // Nothing reaches the chain: the backend prepare is mocked to report a rejected simulation.
+  // Regex, not a glob: the real request carries ?treasury=… and must not slip through to the chain.
+  const PREPARE = /\/api\/v1\/policy\/prepare(\?|$)/;
+  await page.route(PREPARE, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        error: null,
+        meta: { requestId: 'e2e' },
+        data: {
+          preparedTx: { to: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0', data: '0x', value: '0', chainId: 31337, contract: 'PolicyEngine', functionName: 'setSafetyHorizon' },
+          simulation: { ok: false, error: { name: 'InsufficientPoolLiquidity', args: {} } },
+        },
+      }),
+    }),
+  );
+  const policy = page.getByRole('region', { name: 'Policy' });
+  const failed = page.locator('[data-testid="tx-toast"][data-status="FAILED"]');
+  try {
+    // 1) Auto-close after ~5 s.
+    await policy.getByLabel('Safety horizon days').fill('15');
+    await policy.getByRole('button', { name: 'Save' }).first().click();
+    await expect(failed).toContainText('InsufficientPoolLiquidity');
+    await page.mouse.move(0, 0);
+    await expect(failed).toBeHidden({ timeout: 8_000 });
+
+    // 2) Hover pauses it; leaving restarts the 5 s.
+    await policy.getByRole('button', { name: 'Save' }).first().click();
+    await expect(failed).toBeVisible();
+    await failed.hover();
+    await page.waitForTimeout(6_500);
+    await expect(failed).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(failed).toBeVisible(); // restarted, not closed at once
+    await expect(failed).toBeHidden({ timeout: 8_000 });
+
+    // 3) ✕ closes immediately.
+    await policy.getByRole('button', { name: 'Save' }).first().click();
+    await failed.getByRole('button', { name: /Dismiss/ }).click();
+    await expect(failed).toHaveCount(0);
+  } finally {
+    await page.unroute(PREPARE);
   }
 });
 

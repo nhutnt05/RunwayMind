@@ -23,6 +23,8 @@ export interface AdminPrepareResponse {
 }
 
 const ADAPTER_STATUS_INDEX = { NONE: 0, ACTIVE: 1, WITHDRAW_ONLY: 2 } as const;
+/** PolicyEngine.MAX_ADAPTERS */
+export const MAX_ADAPTERS = 5;
 const MAX_ADVANCE_SEC = 365 * 86_400; // Treasury.MAX_TIME_OFFSET
 const bps = z.number().int().min(0).max(10_000);
 
@@ -57,6 +59,28 @@ export function createAdminService(chain: ChainService, chainId: number, poolAdd
     };
   }
 
+  /**
+   * Adding a NEW adapter (not yet listed): it must implement every IVaultAdapter view the agent reads, hold the
+   * Treasury's asset (else AdapterMismatch) and send withdrawals back to THIS Treasury (withdraw() pays treasury()).
+   * Already-listed adapters (status changes) skip the probe.
+   */
+  async function assertAddableAdapter(adapter: Address): Promise<void> {
+    const s = await chain.getSnapshot();
+    if (s.adapters.some((a) => a.address.toLowerCase() === adapter.toLowerCase())) return;
+    if (adapter.toLowerCase() === s.treasury.toLowerCase()) throw new ApiError('VALIDATION_ERROR', 'The Treasury itself cannot be an adapter');
+    if (s.adapters.length >= MAX_ADAPTERS) throw new ApiError('INVALID_STATE', `The whitelist is full (max ${MAX_ADAPTERS} adapters); remove one first`);
+    const p = await chain.probeAdapter(adapter);
+    if (p.missing.length) {
+      throw new ApiError('VALIDATION_ERROR', `${adapter} is not a compatible vault adapter (missing or failing: ${p.missing.join(', ')})`);
+    }
+    if (p.asset!.toLowerCase() !== s.asset.toLowerCase()) {
+      throw new ApiError('VALIDATION_ERROR', `Adapter asset ${p.asset} is not the Treasury asset ${s.asset}`);
+    }
+    if (p.treasury!.toLowerCase() !== s.treasury.toLowerCase()) {
+      throw new ApiError('VALIDATION_ERROR', `Adapter sends withdrawals to ${p.treasury}, not to this Treasury ${s.treasury}`);
+    }
+  }
+
   return {
     /** PolicyEngine setters (ADMIN). Bounds are enforced on-chain; the simulation surfaces InvalidParameter. */
     async preparePolicy(body: PolicyPrepareRequest, from: Address): Promise<AdminPrepareResponse> {
@@ -69,11 +93,11 @@ export function createAdminService(chain: ChainService, chainId: number, poolAdd
           return prepareAndSimulate(from, 'PolicyEngine', policy, abi, body.fn, [BigInt(body.args[0])]);
         case 'setMaxExposureBps':
           return prepareAndSimulate(from, 'PolicyEngine', policy, abi, body.fn, [body.args[0]]);
-        case 'setAdapterStatus':
-          return prepareAndSimulate(from, 'PolicyEngine', policy, abi, body.fn, [
-            getAddress(body.args[0]),
-            ADAPTER_STATUS_INDEX[body.args[1]],
-          ]);
+        case 'setAdapterStatus': {
+          const adapter = getAddress(body.args[0]);
+          if (body.args[1] !== 'NONE') await assertAddableAdapter(adapter);
+          return prepareAndSimulate(from, 'PolicyEngine', policy, abi, body.fn, [adapter, ADAPTER_STATUS_INDEX[body.args[1]]]);
+        }
       }
     },
 

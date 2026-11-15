@@ -46,8 +46,6 @@ const ROUTE_ICON_PATHS: Record<string, ReactNode> = {
       <path d="M12 8v5M12 16h.01" />
     </>
   ),
-  // Stress Test: pulse line
-  '/stress-test': <path d="M3 12h4l2.5-6 4 12 2.5-6H21" />,
   // AI Agent: chip
   '/agent': (
     <>

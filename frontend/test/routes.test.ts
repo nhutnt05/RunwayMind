@@ -11,7 +11,6 @@ describe('APP_ROUTES (docs/08 §1)', () => {
       '/cash-ladder',
       '/vault',
       '/pools',
-      '/stress-test',
       '/agent',
       '/transactions',
       '/settings',

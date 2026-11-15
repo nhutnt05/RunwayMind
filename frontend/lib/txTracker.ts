@@ -50,6 +50,20 @@ export function createTxTracker(now: () => number = () => Date.now()) {
 
 export type TxTracker = ReturnType<typeof createTxTracker>;
 
+/** Toast lifetimes: errors close after 5 s, confirmed/dropped after 15 s; pending/submitted stay until resolved. */
+export const TOAST_DISMISS_MS = { error: 5_000, done: 15_000 } as const;
+
+/** Milliseconds left before a toast closes on its own, or null when it stays (still in flight). */
+export function autoDismissDelay(item: Pick<TxToastItem, 'status' | 'updatedAt'>, now: number): number | null {
+  const total =
+    item.status === 'REVERTED' || item.status === 'FAILED'
+      ? TOAST_DISMISS_MS.error
+      : item.status === 'CONFIRMED' || item.status === 'DROPPED'
+        ? TOAST_DISMISS_MS.done
+        : null;
+  return total === null ? null : Math.max(0, total - (now - item.updatedAt));
+}
+
 export const txTracker = createTxTracker();
 
 let seq = 0;
