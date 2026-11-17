@@ -1,20 +1,5 @@
-// Pure helpers for the D5 UI (docs/08 §2 RunwayMeter / AccruedYieldTicker, §3.3 NL drafts, §3.6 pools).
-import { toUtcMidnight, type CreateObligationRequest, type RiskClass } from '@runwaymind/shared';
-
-// ---- Runway Meter (docs/06 §2.3) --------------------------------------------------------------------------------
-
-export const RUNWAY_CAP_DAYS = 365;
-
-export function runwayLabel(r: { runwayDays: number; capped: boolean }): string {
-  return r.capped || r.runwayDays >= RUNWAY_CAP_DAYS ? '365+ days' : `${r.runwayDays} day${r.runwayDays === 1 ? '' : 's'}`;
-}
-
-/** 0..1 position on the radial gauge (0–365+). */
-export function runwayFraction(days: number): number {
-  return Math.max(0, Math.min(1, days / RUNWAY_CAP_DAYS));
-}
-
-export const CLASS_COLOR: Record<RiskClass, string> = { SAFE: '#059669', WATCH: '#d97706', CRITICAL: '#dc2626' };
+// Pure helpers for the D5 UI (docs/08 §2 AccruedYieldTicker, §3.3 NL drafts, §3.6 pools).
+import { toUtcMidnight, type CreateObligationRequest } from '@runwaymind/shared';
 
 // ---- Accrued yield ticker (docs/08 §2) --------------------------------------------------------------------------
 
@@ -34,25 +19,6 @@ export function weightedApyBps(adapters: readonly { balance: string; apyBps: num
   const total = adapters.reduce((s, a) => s + BigInt(a.balance), 0n);
   if (total === 0n) return 0;
   return Number(adapters.reduce((s, a) => s + BigInt(a.balance) * BigInt(a.apyBps), 0n) / total);
-}
-
-// ---- runway scenario shape (GET /runway baseline, docs/06 §3.5) ---------------------------------------------------
-
-export interface ScenarioJson {
-  id: string;
-  label: string;
-  parameters: Record<string, string | number>;
-  runway: {
-    runwayDays: number;
-    capped: boolean;
-    classification: RiskClass;
-    shortfallNow: string;
-    minLiquidIdle: string;
-    projectedYield: string;
-    failure: { at: number; kind: string; obligationId: string; missing: string } | null;
-  };
-  deltaRunwayDays: number;
-  recommendedAction: { action: 'NONE' | 'WITHDRAW' | 'HOLD' | 'REVIEW_POLICY'; amount: string | null; note: string };
 }
 
 // ---- NL drafts (docs/07 §5.4) -----------------------------------------------------------------------------------

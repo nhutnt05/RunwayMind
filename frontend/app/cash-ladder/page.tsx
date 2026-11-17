@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { LadderSummary, OccurrencesTable, WithdrawalScheduleTable } from '@/components/cashLadder/LadderTables';
 import { LiquidityProjectionChart } from '@/components/cashLadder/LiquidityProjectionChart';
 import { ErrorState, PageHeader, SkeletonCard } from '@/components/ui';
-import { useCashLadder, useOverview } from '@/hooks/useApiQueries';
+import { useActiveObligations, useCashLadder, useOverview } from '@/hooks/useApiQueries';
 import { CASH_LADDER_DEFAULTS } from '@/lib/queries';
 import { ladderChartRows } from '@/lib/views';
 
@@ -17,6 +17,11 @@ export default function CashLadderPage() {
   const overview = useOverview();
   const l = ladder.data?.data;
   const o = overview.data?.data;
+  const obligations = useActiveObligations();
+  const obligationLabels = useMemo(
+    () => new Map((obligations.data?.data ?? []).flatMap((ob) => (ob.metadata?.label ? [[ob.id, ob.metadata.label] as const] : []))),
+    [obligations.data],
+  );
   const rows = useMemo(() => (l ? ladderChartRows(l.daily, o?.asset.decimals ?? 6) : []), [l, o?.asset.decimals]);
 
   return (
@@ -56,7 +61,7 @@ export default function CashLadderPage() {
           <LadderSummary ladder={l} safetyHorizonSec={o.policy.safetyHorizonSec} emergencyBuffer={o.policy.emergencyBuffer} />
           <LiquidityProjectionChart rows={rows} />
           <WithdrawalScheduleTable items={l.withdrawalSchedule} demoStartTime={o.demoStartTime} />
-          <OccurrencesTable items={l.occurrences} demoStartTime={o.demoStartTime} />
+          <OccurrencesTable items={l.occurrences} chainTime={l.asOf} labels={obligationLabels} />
         </div>
       )}
     </>

@@ -29,14 +29,17 @@ contract SeedDemo is Script, DeploymentPaths {
         bool seed = vm.envOr("SEED_OBLIGATIONS", true);
 
         uint64 t0 = treasury.currentTime();
+        // Payments fall due at 00:00 UTC of their day (same rule as the form, A-06): advancing demo time into the
+        // payday makes them payable at once instead of at the seed's time of day.
+        uint64 day0 = t0 - (t0 % 1 days);
         if (seed) {
             address payroll = _recipient("RECIPIENT_PAYROLL", ANVIL_ACCOUNT_3);
             address payroll2 = _recipient("RECIPIENT_PAYROLL_2", ANVIL_ACCOUNT_4);
             address grant = _recipient("RECIPIENT_GRANT", ANVIL_ACCOUNT_5);
             vm.startBroadcast();
-            registry.createObligation(_one(payroll, 20_000e6, t0 + 7 days, Category.PAYROLL, "November payroll"));
-            registry.createObligation(_one(payroll2, 20_000e6, t0 + 30 days, Category.PAYROLL, "December payroll"));
-            registry.createObligation(_one(grant, 10_000e6, t0 + 45 days, Category.GRANT, "Q1 grant"));
+            registry.createObligation(_one(payroll, 20_000e6, day0 + 7 days, Category.PAYROLL, "November payroll"));
+            registry.createObligation(_one(payroll2, 20_000e6, day0 + 30 days, Category.PAYROLL, "December payroll"));
+            registry.createObligation(_one(grant, 10_000e6, day0 + 45 days, Category.GRANT, "Q1 grant"));
             vm.stopBroadcast();
             require(treasury.requiredReserve() == 30_000e6, "requiredReserve != 30,000");
         }

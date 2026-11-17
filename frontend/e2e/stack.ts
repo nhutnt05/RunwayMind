@@ -90,6 +90,10 @@ const CHAIN_ENV = {
 
 export async function startStack(): Promise<void> {
   mkdirSync(STATE, { recursive: true });
+  // A previous run that was interrupted (no teardown) leaves its processes and the backups behind. Clean up first:
+  // otherwise its still-running Anvil makes the deploy fail ("nonce too low") and the backup below would overwrite
+  // the user's original deployment/local.json with the run's modified copy.
+  if (existsSync(resolve(STATE, 'local.json.bak')) || existsSync(resolve(STATE, 'pids.json'))) stopStack();
   const pids: Record<string, number | undefined> = {};
   const save = () => writeFileSync(resolve(STATE, 'pids.json'), JSON.stringify(pids));
   // Deploy.s.sol / SeedDemo.s.sol write deployment/local.json; restored by stopStack().
@@ -119,7 +123,10 @@ export async function startStack(): Promise<void> {
     APP_ORIGIN: WEB_URL,
     SESSION_SECRET: 'e2e-session-secret-e2e-session-secret-0123',
     AGENT_ENABLED: 'true',
-    KEEPER_ENABLED: 'false',
+    // Keeper on so POST /keeper/run works (demo "Advance time" pays at once); 1 h interval keeps its own loop from
+    // paying anything mid-suite, so specs stay deterministic.
+    KEEPER_ENABLED: 'true',
+    KEEPER_INTERVAL_SEC: '3600',
     LLM_ENABLED: 'false',
     AGENT_PRIVATE_KEY: pk(1),
     KEEPER_PRIVATE_KEY: pk(2),
@@ -149,10 +156,17 @@ export function stopStack(): void {
     for (const name of ['frontend', 'backend', 'anvil']) killTree(pids[name]);
     rmSync(file, { force: true });
   }
+  // Restore, then drop the backups: a backup still present at the next start means that run was interrupted.
   const bak = resolve(STATE, 'local.json.bak');
-  if (existsSync(bak)) copyFileSync(bak, resolve(ROOT, 'deployment', 'local.json'));
+  if (existsSync(bak)) {
+    copyFileSync(bak, resolve(ROOT, 'deployment', 'local.json'));
+    rmSync(bak, { force: true });
+  }
   const ts = resolve(STATE, 'tsconfig.json.bak');
-  if (existsSync(ts)) copyFileSync(ts, resolve(FRONTEND, 'tsconfig.json'));
+  if (existsSync(ts)) {
+    copyFileSync(ts, resolve(FRONTEND, 'tsconfig.json'));
+    rmSync(ts, { force: true });
+  }
   rmSync(resolve(BACKEND, 'prisma', 'e2e.db'), { force: true });
   rmSync(resolve(BACKEND, 'prisma', 'e2e.db-journal'), { force: true });
 }

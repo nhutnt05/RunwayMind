@@ -44,8 +44,12 @@ test('wallet connection: wrong network shows banner + switch; connected address 
 test('dashboard renders SRC day-0 data from the backend', async () => {
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Total assets' })).toContainText('100,000.00');
-  await expect(page.getByRole('region', { name: 'Idle (Liquidity Reserve)' })).toContainText('Required: 30,000.00');
-  await expect(page.getByRole('region', { name: 'Runway meter' })).toContainText('365+ days');
+  await expect(page.getByRole('region', { name: 'Idle (Liquidity Reserve)' })).toContainText('Covers the required reserve of 30,000.00');
+  await expect(page.getByRole('region', { name: 'In Yield Vault' })).toContainText('Nothing invested yet · pool APY up to 8.00%');
+  await expect(page.getByRole('region', { name: 'Accrued yield' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Capital efficiency' })).toContainText('target 70%');
+  await expect(page.getByRole('region', { name: 'Runway meter' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: /Accrued yield \(live\)/ })).toHaveCount(0); // merged into one card
 });
 
 test('responsive: dashboard at 375 px has no horizontal scroll', async () => {
@@ -391,4 +395,21 @@ test('treasury switcher (mocked GET /treasuries): visible with two treasuries; s
   expect(await page.evaluate(() => localStorage.getItem('runwaymind.treasury'))).toBe('local-usdc');
   await switcher.selectOption('local-musdc');
   await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+// Last on purpose: moves chain time forward 7 days for the rest of the run.
+test('demo: "+7 days" reaches the payroll day → the keeper pays November payroll at once (due 00:00 UTC)', async () => {
+  await page.goto('/settings');
+  await signIn();
+  const demo = page.getByRole('region', { name: 'Demo controls' });
+  await demo.getByRole('button', { name: '+7 days' }).click();
+  // The advanceTime tx confirms, then the keeper runs immediately (no wait for its 15 s interval).
+  const keeperToast = page.getByTestId('tx-toast').filter({ hasText: 'Keeper: pay what is now due' });
+  await expect(keeperToast).toContainText(/Paid #1(?!\d)/, { timeout: 60_000 });
+  await expect(keeperToast).toHaveAttribute('data-status', 'CONFIRMED');
+
+  await page.goto('/obligations');
+  const filters = page.getByRole('search', { name: 'Filter obligations' });
+  await filters.getByLabel('Show').selectOption('COMPLETED');
+  await expect(page.getByRole('table').getByRole('cell', { name: 'November payroll', exact: true })).toBeVisible();
 });

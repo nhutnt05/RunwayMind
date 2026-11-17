@@ -4,7 +4,7 @@ import { AddressChip, AmountText, GatedButton, SnowtraceLink, StateChip } from '
 import { useAdminGate } from '@/hooks/useAdminGate';
 import { useAdminWrite } from '@/hooks/useAdminWrite';
 import type { TreasuryOverview } from '@/lib/api';
-import { contracts, deployment } from '@/lib/contracts';
+import { contracts } from '@/lib/contracts';
 import { bpsToPercentText } from '@/lib/views';
 
 export function AddressList({ overview }: { overview: TreasuryOverview }) {
@@ -14,12 +14,10 @@ export function AddressList({ overview }: { overview: TreasuryOverview }) {
     ['ObligationRegistry', contracts?.registry.address],
     ['PolicyEngine', contracts?.policy.address],
     ['MockLendingPool', contracts?.pool.address],
-    ['ADMIN', deployment?.roles.admin],
-    ['AGENT', deployment?.roles.agent],
   ];
   return (
-    <section aria-label="Contracts and roles" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-2 text-sm font-semibold text-slate-900">Contracts &amp; roles</h2>
+    <section aria-label="Contracts" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="mb-2 text-sm font-semibold text-slate-900">Contracts</h2>
       <dl className="space-y-2 text-sm">
         {rows
           .filter((r): r is [string, string] => Boolean(r[1]))
@@ -99,7 +97,7 @@ export function BreakerPanel({ active }: { active: boolean }) {
   const write = useAdminWrite();
   const busy = write.isPending;
   return (
-    <section aria-label="Circuit breaker" className={`rounded-xl border p-4 shadow-sm ${active ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white'}`}>
+    <section aria-label="Circuit breaker" className={`h-full rounded-xl border p-4 shadow-sm ${active ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white'}`}>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900">Circuit breaker (R6)</h2>
         <StateChip state={active ? 'TRIPPED' : 'NORMAL'} tone={active ? 'danger' : 'success'} />
@@ -142,7 +140,7 @@ export function BreakerPanel({ active }: { active: boolean }) {
 export function ClockPanel({ chainTime, timeOffset, demoMode }: { chainTime: number; timeOffset: number; demoMode: boolean }) {
   const iso = (t: number) => new Date(t * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
   return (
-    <section aria-label="Clock" className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
+    <section aria-label="Clock" className="h-full rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
       <h2 className="mb-2 font-semibold text-slate-900">Clock</h2>
       <p>
         Chain time: <span className="tabular-nums">{iso(chainTime)}</span>

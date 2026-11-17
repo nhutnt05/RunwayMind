@@ -172,3 +172,19 @@ pnpm dev                                                                        
 Fuji: set the Fuji RPC and the DEPLOYER / AGENT / KEEPER keys in `.env`, then `pnpm dev`. To deploy, verify and seed a
 fresh demo treasury on Fuji (new contract addresses; the current `deployment/fuji.json` is backed up first):
 `pnpm demo:reset -- --network fuji --verify`. Hacked-agent scene: `pnpm demo:attack`. Free-tier RPCs limit `eth_getLogs`; set `INDEXER_BLOCK_RANGE` in `.env` (e.g. 5–10) when using one.
+
+## Mainnet Solution (without mocks)
+
+On Fuji, RunwayMind uses `MockUSDC` and `MockLendingPool` so the demo can control APY, pool pauses and time. On Avalanche C-Chain mainnet, the mocks are replaced by real components. The core contracts (`Treasury`, `PolicyEngine`, `ObligationRegistry`) and safety rules R1–R6 stay **unchanged**, because the Treasury talks to every yield source through the same `IVaultAdapter` interface.
+
+| Fuji (demo) | Mainnet (solution) |
+|---|---|
+| `MockUSDC` | Native Circle **USDC** on C-Chain |
+| `MockLendingPool` | Real lending protocols via adapters: **`AaveV3Adapter`** (Aave V3), **`BenqiAdapter`** (Benqi), **`ERC4626Adapter`** (ERC-4626 vaults) |
+| Demo-controlled APY / utilization | Real APY, utilization and TVL read from the protocols for the Pool Risk Score |
+| `timeOffset` (DEMO MODE) | `demoMode = false`, real block time only |
+| Single admin wallet | **Safe multisig** + **timelock** on policy changes |
+| Agent key in `.env` | Agent key in **KMS / HSM** |
+| One pool, 70% exposure | Several pools, **≤ 50% exposure per pool** (R3) |
+
+**How it works:** deploy the real adapters → ADMIN whitelists them (R4) → the agent invests idle capital across real pools, while R1–R6 keep payroll liquidity safe exactly as on Fuji. Integration with real Aave V3 is already verified by tests on an Avalanche mainnet fork.

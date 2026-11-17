@@ -272,3 +272,20 @@ test('settings: Add adapter checks the address on-chain before it can be signed 
   await page.getByRole('button', { name: 'Add adapter' }).click();
   await expect(page.getByRole('form', { name: 'Add adapter' }).getByLabel('Adapter address')).toHaveValue('');
 });
+
+test('obligations: No. column is centered; Actions column only in Active and All views', async ({ page }) => {
+  await page.goto('/obligations');
+  await waitForSettled(page);
+  const table = page.getByRole('table');
+  await expect(table.getByRole('columnheader', { name: 'No.' })).toHaveCSS('text-align', 'center');
+  await expect(table.getByRole('row').nth(1).getByRole('cell').first()).toHaveText('1');
+  await expect(table.getByRole('columnheader', { name: 'Actions' })).toBeVisible(); // Active (default)
+  const show = page.getByRole('search', { name: 'Filter obligations' }).getByLabel('Show');
+  await show.selectOption('ALL');
+  await expect(table.getByRole('columnheader', { name: 'Actions' })).toBeVisible();
+  for (const v of ['COMPLETED', 'CANCELLED']) {
+    await show.selectOption(v);
+    await expect(table.or(page.getByText(/^No obligations/)).first()).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Actions' })).toHaveCount(0);
+  }
+});

@@ -1,6 +1,8 @@
 import { AmountText, EmptyState, StateChip } from '@/components/ui';
 import type { CashLadderJson } from '@/lib/api';
-import { dayLabel } from '@/lib/dashboard';
+import type { Category } from '@runwaymind/shared';
+import { countdown, dayLabel } from '@/lib/dashboard';
+import { categoryLabel } from '@/lib/obligationFilters';
 import { bpsToPercentText } from '@/lib/views';
 
 export function LadderSummary({ ladder, safetyHorizonSec, emergencyBuffer }: { ladder: CashLadderJson; safetyHorizonSec: number; emergencyBuffer: string }) {
@@ -42,7 +44,6 @@ export function WithdrawalScheduleTable({ items, demoStartTime }: { items: CashL
           <tr>
             <th className="px-4 py-2">Deadline</th>
             <th className="px-4 py-2 text-right">Amount</th>
-            <th className="px-4 py-2">Covers</th>
             <th className="px-4 py-2">State</th>
           </tr>
         </thead>
@@ -52,9 +53,6 @@ export function WithdrawalScheduleTable({ items, demoStartTime }: { items: CashL
               <td className="px-4 py-2">{dayLabel(it.deadline, demoStartTime)}</td>
               <td className="px-4 py-2 text-right">
                 <AmountText value={it.amount} />
-              </td>
-              <td className="px-4 py-2 text-xs">
-                {it.covers.map((c) => `#${c.obligationId} (occ. ${c.occurrenceIndex}, ${dayLabel(c.dueDate, demoStartTime)})`).join(', ')}
               </td>
               <td className="px-4 py-2">
                 <StateChip state={it.state} />
@@ -67,41 +65,73 @@ export function WithdrawalScheduleTable({ items, demoStartTime }: { items: CashL
   );
 }
 
-export function OccurrencesTable({ items, demoStartTime }: { items: CashLadderJson['occurrences']; demoStartTime: number | null }) {
+/**
+ * Upcoming payments in the projection window, numbered in date order. Obligations are shown by name (`labels`:
+ * obligationId → label); repeat payments of a recurring obligation say which payment they are.
+ */
+export function OccurrencesTable({
+  items,
+  chainTime,
+  labels = new Map(),
+}: {
+  items: CashLadderJson['occurrences'];
+  chainTime: number;
+  labels?: ReadonlyMap<string, string>;
+  demoStartTime?: number | null;
+}) {
   if (!items.length) return <EmptyState title="No upcoming occurrences" description="Create an obligation to see its projected payments." action={{ label: 'Obligations', href: '/obligations' }} />;
   return (
-    <section aria-label="Projected occurrences" className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">Projected occurrences</h2>
-      <table className="mt-2 w-full text-left text-sm">
-        <thead className="text-xs text-slate-600">
-          <tr>
-            <th className="px-4 py-2">Obligation</th>
-            <th className="px-4 py-2">Due</th>
-            <th className="px-4 py-2">Withdrawal deadline</th>
-            <th className="px-4 py-2 text-right">Amount</th>
-            <th className="px-4 py-2">Category</th>
-            <th className="px-4 py-2">State</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((o) => (
-            <tr key={`${o.obligationId}-${o.occurrenceIndex}`} className="border-t border-slate-100">
-              <td className="px-4 py-2">
-                #{o.obligationId} · occ. {o.occurrenceIndex}
-              </td>
-              <td className="px-4 py-2">{dayLabel(o.dueDate, demoStartTime)}</td>
-              <td className="px-4 py-2">{dayLabel(o.withdrawalDeadline, demoStartTime)}</td>
-              <td className="px-4 py-2 text-right">
-                <AmountText value={o.amount} />
-              </td>
-              <td className="px-4 py-2 text-xs">{o.category.replace(/_/g, ' ')}</td>
-              <td className="px-4 py-2">
-                <StateChip state={o.state} />
-              </td>
+    <section aria-labelledby="occurrences-title" className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="px-4 pt-4">
+        <h2 id="occurrences-title" className="text-sm font-semibold text-slate-900">
+          Projected occurrences
+        </h2>
+        <p className="mt-0.5 text-xs text-slate-600">Every payment due in the projection window, earliest first.</p>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <tr>
+              <th scope="col" className="w-14 px-4 py-2 text-center">No.</th>
+              <th scope="col" className="px-4 py-2">Obligation</th>
+              <th scope="col" className="px-4 py-2">Due</th>
+              <th scope="col" className="px-4 py-2">Withdrawal deadline</th>
+              <th scope="col" className="px-4 py-2">Amount</th>
+              <th scope="col" className="px-4 py-2">Category</th>
+              <th scope="col" className="px-4 py-2">State</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.map((o, i) => (
+              <tr key={`${o.obligationId}-${o.occurrenceIndex}`} className="hover:bg-slate-50/60">
+                <td className="px-4 py-2.5 text-center">
+                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold tabular-nums text-slate-900 ring-1 ring-slate-200">
+                    {i + 1}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5">
+                  <span className="font-medium text-slate-900">{labels.get(String(o.obligationId)) ?? 'Untitled obligation'}</span>
+                  {o.occurrenceIndex > 1 ? <span className="block text-xs text-slate-500">Payment {o.occurrenceIndex}</span> : null}
+                </td>
+                <td className="px-4 py-2.5 text-xs">
+                  <span className="font-medium text-slate-900">{dayLabel(o.dueDate)}</span>
+                  <span className="block text-slate-500">{countdown(o.dueDate, chainTime)}</span>
+                </td>
+                <td className="px-4 py-2.5 text-xs text-slate-700">{dayLabel(o.withdrawalDeadline)}</td>
+                <td className="px-4 py-2.5">
+                  <AmountText value={o.amount} />
+                </td>
+                <td className="px-4 py-2.5">
+                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{categoryLabel(o.category as Category)}</span>
+                </td>
+                <td className="px-4 py-2.5">
+                  <StateChip state={o.state} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

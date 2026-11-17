@@ -18,6 +18,8 @@ interface Props {
   gate: AdminGate;
   /** Treasury asset (from the overview), shown in the cancel dialog. */
   asset?: { symbol: string; address: string } | null;
+  /** Actions column (Edit / Cancel). Off for Completed / Cancelled lists, where no row can be changed. */
+  showActions?: boolean;
 }
 
 function recurrenceText(o: ObligationItem): string {
@@ -38,7 +40,7 @@ function editOriginal(o: ObligationItem) {
 }
 
 /** docs/08 §3.3 ObligationTable: table ≥ md, stacked cards < md (docs/08 §9). */
-export function ObligationTable({ obligations, chainTime, demoStartTime, gate, asset = null }: Props) {
+export function ObligationTable({ obligations, chainTime, demoStartTime, gate, asset = null, showActions = true }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   // Snapshot of the obligation being cancelled: the dialog keeps showing it after the row leaves the list.
   const [cancelling, setCancelling] = useState<ObligationItem | null>(null);
@@ -100,7 +102,7 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate, a
           <caption className="sr-only">Obligations</caption>
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
             <tr>
-              <th scope="col" className="px-3 py-2">ID</th>
+              <th scope="col" className="w-14 px-3 py-2 text-center">No.</th>
               <th scope="col" className="px-3 py-2">Label</th>
               <th scope="col" className="px-3 py-2">Category</th>
               <th scope="col" className="px-3 py-2">Recipient</th>
@@ -110,13 +112,17 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate, a
               <th scope="col" className="px-3 py-2">Recurrence</th>
               <th scope="col" className="px-3 py-2">State</th>
               <th scope="col" className="px-3 py-2 text-center">Note</th>
-              <th scope="col" className="px-3 py-2">Actions</th>
+              {showActions ? <th scope="col" className="px-3 py-2">Actions</th> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sorted.map((o) => (
-              <FragmentRow key={o.id} colSpan={11} editor={editing === o.id ? <EditRow o={o} onDone={() => setEditing(null)} /> : null}>
-                <td className="px-3 py-2 font-mono text-xs text-slate-600">#{o.id}</td>
+            {sorted.map((o, i) => (
+              <FragmentRow key={o.id} colSpan={showActions ? 11 : 10} editor={editing === o.id ? <EditRow o={o} onDone={() => setEditing(null)} /> : null}>
+                <td className="px-3 py-2 text-center">
+                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold tabular-nums text-slate-900 ring-1 ring-slate-200">
+                    {i + 1}
+                  </span>
+                </td>
                 <td className="px-3 py-2 font-medium text-slate-900">{o.metadata?.label ?? '—'}</td>
                 <td className="px-3 py-2 text-xs">{o.category.replace(/_/g, ' ')}</td>
                 <td className="px-3 py-2"><AddressChip address={o.recipient} /></td>
@@ -125,11 +131,11 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate, a
                   {dayLabel(o.nextDueDate, demoStartTime)}
                   {o.status === 'ACTIVE' ? <span className="block text-slate-500">{countdown(o.nextDueDate, chainTime)}</span> : null}
                 </td>
-                <td className="px-3 py-2 text-xs">{o.status === 'ACTIVE' ? dayLabel(o.withdrawalDeadline, demoStartTime) : '—'}</td>
+                <td className="px-3 py-2 text-xs">{dayLabel(o.withdrawalDeadline, demoStartTime)}</td>
                 <td className="px-3 py-2 text-xs">{recurrenceText(o)}</td>
                 <td className="px-3 py-2"><StateChip state={o.derivedState} /></td>
                 <td className="px-3 py-2 text-center"><NoteButton o={o} onOpen={setViewingNote} /></td>
-                <td className="px-3 py-2">{actions(o)}</td>
+                {showActions ? <td className="px-3 py-2">{actions(o)}</td> : null}
               </FragmentRow>
             ))}
           </tbody>
@@ -138,13 +144,18 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate, a
 
       {/* < md: stacked cards */}
       <ul className="space-y-3 md:hidden">
-        {sorted.map((o) => (
+        {sorted.map((o, i) => (
           <li key={o.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-900">{o.metadata?.label ?? `Obligation #${o.id}`}</p>
+                <p className="truncate font-medium text-slate-900">
+                  <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-100 px-1 align-[1px] text-[11px] font-semibold tabular-nums text-slate-900 ring-1 ring-slate-200">
+                    {i + 1}
+                  </span>
+                  {o.metadata?.label ?? 'Untitled obligation'}
+                </p>
                 <p className="text-xs text-slate-600">
-                  #{o.id} · {o.category.replace(/_/g, ' ')} · {recurrenceText(o)}
+                  {o.category.replace(/_/g, ' ')} · {recurrenceText(o)}
                 </p>
               </div>
               <StateChip state={o.derivedState} />
@@ -161,7 +172,7 @@ export function ObligationTable({ obligations, chainTime, demoStartTime, gate, a
               <dt className="self-center text-slate-500">Note</dt>
               <dd><NoteButton o={o} onOpen={setViewingNote} /></dd>
             </dl>
-            <div className="mt-2">{actions(o)}</div>
+            {showActions && o.status === 'ACTIVE' ? <div className="mt-2">{actions(o)}</div> : null}
             {editing === o.id ? (
               <div className="mt-3">
                 <EditRow o={o} onDone={() => setEditing(null)} />

@@ -199,12 +199,13 @@ function normalizeDraft(o: ObligationDraftLLM, input: ParseObligationsInput, men
     return { ok: false, clarification: `The amount ${o.amount} USDC for "${o.label}" does not appear in your text; please state it explicitly.` };
   }
 
-  // Relative phrases in the user's own text ("sau 7 ngày", "in 7 days") → exact chain time + N days (docs/12 Day N).
-  // Calendar dates keep A-06: 00:00 UTC of the date the LLM resolved.
+  // Relative phrases in the user's own text ("sau 7 ngày", "in 7 days") → 00:00 UTC of (today + N days), computed in
+  // code from chain time. Calendar dates: 00:00 UTC of the date the LLM resolved (A-06). Every due date therefore
+  // starts its day, so advancing demo time into the payday makes the payment due at once.
   const offsetDays = relativeOffsetDays(o.sourceSpan);
   let firstDueDate: number;
   if (offsetDays !== null) {
-    firstDueDate = input.chainTime + offsetDays * SECONDS_PER_DAY;
+    firstDueDate = input.chainTime - (input.chainTime % SECONDS_PER_DAY) + offsetDays * SECONDS_PER_DAY;
   } else {
     try {
       firstDueDate = toUtcMidnight(o.firstDueDate);

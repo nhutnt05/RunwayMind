@@ -68,3 +68,22 @@ describe('api client (docs/07 §2.1 envelope)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('timelineTicks (withdrawal timeline axis)', () => {
+  it('picks a step that keeps ≤ 8 ticks, on UTC midnights inside the range', async () => {
+    const { timelineTicks } = await import('../lib/dashboard');
+    const start = Date.UTC(2026, 10, 17, 9) / 1000;
+    const r = timelineTicks(start, start + 45 * 86_400);
+    expect(r.stepDays).toBe(7);
+    expect(r.ticks.length).toBeLessThanOrEqual(8);
+    expect(r.ticks[0]).toBe(Date.UTC(2026, 10, 18) / 1000);
+    for (const t of r.ticks) {
+      expect(t % 86_400).toBe(0);
+      expect(t).toBeGreaterThan(start);
+      expect(t).toBeLessThanOrEqual(start + 45 * 86_400);
+    }
+    expect(timelineTicks(start, start + 5 * 86_400).stepDays).toBe(1);
+    expect(timelineTicks(start, start + 200 * 86_400).stepDays).toBe(30);
+    expect(timelineTicks(start, start).ticks).toEqual([]);
+  });
+});

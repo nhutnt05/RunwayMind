@@ -10,6 +10,8 @@ import { appChain } from '@/lib/chains';
 import { contracts } from '@/lib/contracts';
 import { GatedButton } from '@/components/ui';
 import type { AdminGate } from '@/lib/recommendations';
+import { keeperRunSummary, type KeeperRunJson } from '@/lib/keeperRun';
+import { newToastId, txTracker } from '@/lib/txTracker';
 import { bpsToPercentText, percentToBps } from '@/lib/views';
 
 /** Off-chain agent settings (ADMIN): PUT /agent/settings, bounds re-checked by the API (docs/09 §6). */
@@ -129,6 +131,7 @@ const prepareDemo = (body: DemoPrepareRequest) => async () => (await api.post<Ad
 /** Demo Controls (docs/08 §3.10 §4), only rendered when the Treasury is in demoMode. */
 export function DemoControls({ gate }: { gate: AdminGate }) {
   const write = useAdminWrite();
+  const qc = useQueryClient();
   const pool = contracts?.pool;
   const reads = useReadContracts({
     allowFailure: false,
@@ -152,7 +155,30 @@ export function DemoControls({ gate }: { gate: AdminGate }) {
     setError(null);
     write.mutate({ title, contract, functionName: body.fn, prepare: prepareDemo(body) }, { onError: (e) => setError(e.message) });
   };
-  const advance = (days: number) => run(`Advance time +${days} day${days === 1 ? '' : 's'}`, 'Treasury', { fn: 'advanceTime', args: [days * 86_400] });
+  /**
+   * Demo time travel. Once the advanceTime tx is confirmed, the keeper runs at once so anything now due (due dates
+   * are 00:00 UTC of their day) is paid immediately instead of on the keeper's next interval tick.
+   */
+  const advance = (days: number) => {
+    setError(null);
+    const body: DemoPrepareRequest = { fn: 'advanceTime', args: [days * 86_400] };
+    write.mutate(
+      { title: `Advance time +${days} day${days === 1 ? '' : 's'}`, contract: 'Treasury', functionName: body.fn, prepare: prepareDemo(body) },
+      { onError: (e) => setError(e.message), onSuccess: () => void payDueNow() },
+    );
+  };
+  const payDueNow = async () => {
+    const id = newToastId('keeper');
+    txTracker.upsert({ id, title: 'Keeper: pay what is now due', status: 'PENDING', message: 'Checking obligations at the new date…' });
+    try {
+      const r = keeperRunSummary((await api.post<KeeperRunJson>('/keeper/run')).data);
+      txTracker.upsert({ id, ...r });
+    } catch (e) {
+      txTracker.upsert({ id, status: 'FAILED', message: `${(e as Error).message}. The scheduled keeper will retry.` });
+    } finally {
+      await Promise.all([['obligations'], ['keeper'], ['overview'], ['transactions']].map((queryKey) => qc.invalidateQueries({ queryKey })));
+    }
+  };
   const btn = 'rounded-md border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium disabled:opacity-50';
 
   return (

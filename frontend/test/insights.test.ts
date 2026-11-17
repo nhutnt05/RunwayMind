@@ -3,23 +3,12 @@ import { CreateObligationRequestSchema } from '@runwaymind/shared';
 import {
   draftDueDate,
   draftToCreateRequest,
-  runwayFraction,
-  runwayLabel,
   tickAccruedYield,
   weightedApyBps,
   type DraftJson,
 } from '../lib/insights';
 
 const USDC = (n: number) => BigInt(n) * 1_000_000n;
-
-describe('runway meter helpers', () => {
-  it('labels, gauge fraction and worst-case line (docs/06 §2.3)', () => {
-    expect(runwayLabel({ runwayDays: 365, capped: true })).toBe('365+ days');
-    expect(runwayLabel({ runwayDays: 97, capped: false })).toBe('97 days');
-    expect(runwayFraction(97)).toBeCloseTo(97 / 365);
-    expect(runwayFraction(900)).toBe(1);
-  });
-});
 
 describe('accrued yield ticker', () => {
   it('70,000 at 8% for 2 days → +30.68 (docs/12 §3)', () => {

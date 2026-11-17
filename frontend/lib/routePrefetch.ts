@@ -3,7 +3,7 @@
 // staleTime) and dedupes in-flight fetches, so repeated hovers cost nothing. Entries stay scoped per selected
 // treasury by the QueryClient's queryKeyHashFn; only public treasury data is prefetched (no wallet-specific data).
 import type { QueryClient } from '@tanstack/react-query';
-import { poolsQuery, runwayQuery } from '@/hooks/useApiQueries';
+import { poolsQuery } from '@/hooks/useApiQueries';
 import {
   CASH_LADDER_DEFAULTS,
   agentActivityQuery,
@@ -24,7 +24,7 @@ interface QueryDef {
 
 /** Queries each route issues on mount, with the same keys and default arguments as the page. */
 export const ROUTE_QUERIES: Record<string, () => QueryDef[]> = {
-  '/': () => [overviewQuery(), obligationsQuery('ACTIVE'), withdrawalScheduleQuery(), runwayQuery(), pendingRecommendationsQuery()],
+  '/': () => [overviewQuery(), obligationsQuery('ACTIVE'), withdrawalScheduleQuery(), pendingRecommendationsQuery()],
   '/treasury': () => [overviewQuery()],
   '/obligations': () => [overviewQuery(), obligationsQuery('ACTIVE')],
   '/cash-ladder': () => [overviewQuery(), cashLadderQuery(CASH_LADDER_DEFAULTS.projectionDays, CASH_LADDER_DEFAULTS.includeYield)],

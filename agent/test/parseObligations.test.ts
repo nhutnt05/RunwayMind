@@ -208,8 +208,10 @@ describe('NL obligation parser (docs/05 §6, docs/10 §4.5)', () => {
       ]),
     );
     const r = await parseObligations(input(text, { treasury: '0x00000000000000000000000000000000000000f1', totalAssets: USDC(100_000) }), deps(provider));
-    // Relative phrases → exact chain time + N days (D5-ALL B-5), not 00:00 UTC.
-    expect(r.drafts.map((d) => [d.amount, (d.firstDueDate - CHAIN_TIME) / DAY, d.interval, d.maxOccurrences, d.warnings])).toEqual([
+    // Relative phrases → 00:00 UTC of (today + N days), so demo time travel into the payday makes them payable.
+    const today0 = CHAIN_TIME - (CHAIN_TIME % DAY);
+    for (const d of r.drafts) expect(d.firstDueDate % DAY).toBe(0);
+    expect(r.drafts.map((d) => [d.amount, (d.firstDueDate - today0) / DAY, d.interval, d.maxOccurrences, d.warnings])).toEqual([
       [USDC(20_000), 7, 0, 1, []],
       [USDC(20_000), 30, 0, 1, []],
       [USDC(10_000), 45, 0, 1, []],
@@ -291,7 +293,7 @@ describe('NL obligation parser (docs/05 §6, docs/10 §4.5)', () => {
 });
 
 describe('nl relative vs calendar dates (D5-ALL B-5)', () => {
-  it('nl_exactOffset_vi_en: "sau N ngày" / "in N days" = chain time + N × 86,400 exactly (not 00:00 UTC)', async () => {
+  it('nl_relativeOffset_vi_en: "sau N ngày" / "in N days" = 00:00 UTC of (today + N days), counted from chain time', async () => {
     const { provider } = mockProvider(
       llmJson([
         { label: 'Payroll', category: 'PAYROLL', recipient: A1, amount: '20000', firstDueDate: isoIn(7), sourceSpan: `Trả lương 20k cho ${A1} sau 7 ngày` },
@@ -301,8 +303,9 @@ describe('nl relative vs calendar dates (D5-ALL B-5)', () => {
     );
     const text = `Trả lương 20k cho ${A1} sau 7 ngày; pay invoice 3k to ${A1} in 30 days; grant 10k to ${A1} 45 days from now`;
     const r = await parseObligations(input(text), deps(provider));
-    expect(r.drafts.map((d) => d.firstDueDate)).toEqual([CHAIN_TIME + 7 * DAY, CHAIN_TIME + 30 * DAY, CHAIN_TIME + 45 * DAY]);
-    expect(r.drafts.every((d) => d.firstDueDate % DAY !== 0)).toBe(true); // chain time is 01:00 UTC → not midnight
+    // Chain time is 01:00 UTC: the due date is the start of day N, so advancing demo time into that day makes it payable.
+    expect(r.drafts.map((d) => d.firstDueDate)).toEqual([TODAY + 7 * DAY, TODAY + 30 * DAY, TODAY + 45 * DAY]);
+    expect(r.drafts.every((d) => d.firstDueDate % DAY === 0)).toBe(true);
   });
 
   it('nl_calendarDate: an explicit calendar date still rounds to 00:00 UTC (A-06)', async () => {

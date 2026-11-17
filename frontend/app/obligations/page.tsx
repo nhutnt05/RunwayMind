@@ -139,6 +139,7 @@ export default function ObligationsPage() {
               demoStartTime={demoStartTime}
               gate={gate}
               asset={overview.data?.data.asset ?? null}
+              showActions={status === 'ACTIVE' || status === 'ALL'}
             />
           ) : obligations.isError ? (
             <ErrorState

@@ -86,6 +86,36 @@ export const CalendarIcon = ({ className }: P) => (
   </Icon>
 );
 
+export const LayersIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+    <path d="m3 13 9 5 9-5" />
+  </Icon>
+);
+
+export const CashIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <rect x="2.5" y="6" width="19" height="12" rx="2" />
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M6 9.5v.01M18 14.5v.01" />
+  </Icon>
+);
+
+export const VaultIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <rect x="3" y="4" width="18" height="15" rx="2" />
+    <circle cx="12" cy="11.5" r="3.5" />
+    <path d="M12 8v1M12 14v1M7 19v2M17 19v2" />
+  </Icon>
+);
+
+export const TrendUpIcon = ({ className }: P) => (
+  <Icon className={className}>
+    <path d="m3 17 6-6 4 4 8-8" />
+    <path d="M15 7h6v6" />
+  </Icon>
+);
+
 export const CloseIcon = ({ className }: P) => (
   <Icon className={className}>
     <path d="M18 6 6 18M6 6l12 12" />

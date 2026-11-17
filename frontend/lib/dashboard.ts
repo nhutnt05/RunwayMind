@@ -44,3 +44,20 @@ export function timelinePosition(t: number, start: number, end: number): number 
   if (end <= start) return 0;
   return Math.min(100, Math.max(0, ((t - start) / (end - start)) * 100));
 }
+
+const TICK_STEPS_DAYS = [1, 2, 7, 14, 30, 60, 90] as const;
+
+/**
+ * Axis ticks for a time chart from `start` to `end` (chain seconds): UTC midnights spaced by the smallest step in
+ * TICK_STEPS_DAYS that gives at most `maxTicks` ticks. Display only.
+ */
+export function timelineTicks(start: number, end: number, maxTicks = 8): { stepDays: number; ticks: number[] } {
+  if (end <= start) return { stepDays: 1, ticks: [] };
+  const spanDays = (end - start) / SECONDS_PER_DAY;
+  const stepDays: number = TICK_STEPS_DAYS.find((d) => spanDays / d <= maxTicks) ?? 90;
+  const step = stepDays * SECONDS_PER_DAY;
+  const firstMidnight = start - (start % SECONDS_PER_DAY) + SECONDS_PER_DAY;
+  const ticks: number[] = [];
+  for (let t = firstMidnight; t <= end; t += step) ticks.push(t);
+  return { stepDays, ticks };
+}

@@ -14,8 +14,7 @@ import {
   withdrawalScheduleQuery,
   type TransactionFilters,
 } from '@/lib/queries';
-import type { Address, PoolRiskBand, RiskClass } from '@runwaymind/shared';
-import type { ScenarioJson } from '@/lib/insights';
+import type { Address, PoolRiskBand } from '@runwaymind/shared';
 
 // docs/08 §5: dashboard data refreshes every 5 s.
 const DASHBOARD_REFRESH_MS = 5_000;
@@ -54,13 +53,7 @@ export function useAgentSettings() {
   return useQuery(agentSettingsQuery());
 }
 
-// ---- D5 (docs/08 §2, §3.6, §3.7) -------------------------------------------------------------------------------------
-
-export interface RunwayJson {
-  baseline: ScenarioJson['runway'];
-  worstCase: { id: string; runwayDays: number; classification: RiskClass } | null;
-  lastStressTestId: string | null;
-}
+// ---- D5 (docs/08 §3.6) -------------------------------------------------------------------------------------
 
 export interface PoolJson {
   address: Address;
@@ -82,12 +75,7 @@ export interface PoolDetailJson extends PoolJson {
   riskHistory: { computedAt: number; score: number; band: PoolRiskBand }[];
 }
 
-export const runwayQuery = () => ({ queryKey: ['runway'] as const, queryFn: () => api.get<RunwayJson>('/runway') });
 export const poolsQuery = () => ({ queryKey: ['pools'] as const, queryFn: () => api.get<PoolJson[]>('/pools') });
-
-export function useRunway() {
-  return useQuery({ ...runwayQuery(), refetchInterval: DASHBOARD_REFRESH_MS });
-}
 
 export function usePools() {
   return useQuery({ ...poolsQuery(), refetchInterval: 10_000 });
