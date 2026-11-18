@@ -286,7 +286,7 @@ describe('event indexer (docs/07 §6)', () => {
     expect(await prisma.transaction.findUnique({ where: { hash: payTx } })).toMatchObject({ kind: 'PAY', initiator: 'INDEXER', status: 'CONFIRMED' });
 
     // principal = 70,000 − 5,000 pulled; adapter now holds 65,100 → accruedYield 100
-    expect(await repos.netPrincipal()).toEqual({ indexed: true, principal: USDC(65_000) });
+    expect(await repos.netPrincipal()).toEqual({ indexed: true, principal: USDC(65_000), lastBlock: 300n });
     const chain = new FakeChain();
     chain.snapshot = { ...chain.snapshot, adapters: [{ ...chain.snapshot.adapters[0]!, balance: USDC(65_100) }] };
     const { app } = await makeApp(chain);

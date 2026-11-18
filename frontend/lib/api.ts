@@ -112,6 +112,9 @@ export interface TreasuryOverview {
   capitalEfficiencyBps: number;
   actualEfficiencyBps: number;
   accruedYield: string | null;
+  /** OK = accruedYield is current; SYNCING = event indexer is catching up (accruedYield null); NOT_INDEXED = never ran. */
+  accruedYieldStatus?: 'OK' | 'SYNCING' | 'NOT_INDEXED';
+  indexerLagBlocks?: number | null;
   runway: { runwayDays: number; capped: boolean; classification: RiskClass };
   policy: { safetyHorizonSec: number; emergencyBuffer: string; maxExposureBps: number };
   adapters: {

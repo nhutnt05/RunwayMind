@@ -1,5 +1,5 @@
 // Pure helpers for the D5 UI (docs/08 §2 AccruedYieldTicker, §3.3 NL drafts, §3.6 pools).
-import { toUtcMidnight, type CreateObligationRequest } from '@runwaymind/shared';
+import { formatUsdc, toUtcMidnight, type CreateObligationRequest } from '@runwaymind/shared';
 
 // ---- Accrued yield ticker (docs/08 §2) --------------------------------------------------------------------------
 
@@ -12,6 +12,17 @@ const YEAR_SEC = 365n * 86_400n;
 export function tickAccruedYield(accruedAtSync: bigint, vaultBalance: bigint, apyBps: number, elapsedSec: number): bigint {
   if (elapsedSec <= 0 || apyBps <= 0 || vaultBalance <= 0n) return accruedAtSync;
   return accruedAtSync + (vaultBalance * BigInt(apyBps) * BigInt(Math.floor(elapsedSec))) / (10_000n * YEAR_SEC);
+}
+
+/** Signed amount for display: "+1.23", "−1.23" (true minus sign) or "0.00"; never "+-". */
+export function signedUsdc(v: bigint, decimals = 6, places = 2): string {
+  const abs = formatUsdc(v < 0n ? -v : v, decimals, places);
+  return v > 0n ? `+${abs}` : v < 0n ? `−${abs}` : abs;
+}
+
+/** True when an amount is below 0.01 token units (rounding dust left in a vault after a full withdrawal). */
+export function isDust(amount: bigint, decimals = 6): boolean {
+  return amount < 10n ** BigInt(Math.max(0, decimals - 2));
 }
 
 /** Vault-weighted APY across adapters (bps) for the ticker. */

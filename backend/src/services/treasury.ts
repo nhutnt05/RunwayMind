@@ -23,6 +23,20 @@ import type { ChainService } from './chain';
 const DAY = 86_400;
 
 /** docs/07 §4.2 derivedState. DUE = due within the current day; OVERDUE = at least one day past due. */
+/** Blocks the event indexer may trail the snapshot by before accrued yield is withheld (a few polls on Fuji). */
+export const ACCRUED_YIELD_MAX_LAG_BLOCKS = 50n;
+
+export function accruedYieldView(
+  principal: { indexed: boolean; principal: bigint; lastBlock: bigint | null },
+  snapshotBlock: bigint,
+  vaultTotal: bigint,
+): { accruedYield: bigint | null; accruedYieldStatus: 'OK' | 'SYNCING' | 'NOT_INDEXED'; indexerLagBlocks: number | null } {
+  if (!principal.indexed || principal.lastBlock === null) return { accruedYield: null, accruedYieldStatus: 'NOT_INDEXED', indexerLagBlocks: null };
+  const lag = snapshotBlock > principal.lastBlock ? snapshotBlock - principal.lastBlock : 0n;
+  if (lag > ACCRUED_YIELD_MAX_LAG_BLOCKS) return { accruedYield: null, accruedYieldStatus: 'SYNCING', indexerLagBlocks: Number(lag) };
+  return { accruedYield: vaultTotal - principal.principal, accruedYieldStatus: 'OK', indexerLagBlocks: Number(lag) };
+}
+
 export function derivedState(ob: ObligationOnChain, now: number, safetyHorizonSec: number): ObligationDerivedState {
   if (ob.status === 'CANCELLED') return 'CANCELLED';
   if (ob.status === 'COMPLETED') return 'PAID';
@@ -86,8 +100,10 @@ export function createTreasuryService(chain: ChainService, repos: Repositories, 
         investableCapital: ladder.investableCapital,
         capitalEfficiencyBps: ladder.capitalEfficiencyBps,
         actualEfficiencyBps: ladder.actualEfficiencyBps,
-        // null until the event indexer (D3-B2) has populated principal accounting
-        accruedYield: principal.indexed ? ladder.vaultTotal - principal.principal : null,
+        // vault balance − net principal from indexed Invested/Withdrawn events. Only valid when the indexer has caught
+        // up with the snapshot block: a lagging indexer misses recent withdrawals and would report a wrong (even
+        // negative) yield, so it is null with status SYNCING until then (null + NOT_INDEXED before the first run).
+        ...accruedYieldView(principal, s.blockNumber, ladder.vaultTotal),
         runway: { runwayDays: runway.runwayDays, capped: runway.capped, classification: runway.classification },
         policy: s.policy,
         adapters: s.adapters.map((a) => ({

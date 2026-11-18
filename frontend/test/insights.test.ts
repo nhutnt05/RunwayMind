@@ -57,3 +57,20 @@ describe('draftDueDate (D5-ALL B-5)', () => {
     expect(draftDueDate(exact, '2026-11-20', true)).toBe(Date.UTC(2026, 10, 20) / 1000);
   });
 });
+
+describe('signedUsdc / isDust (accrued yield card)', () => {
+  it('formats the sign once: + for gains, true minus for losses, none for zero (never "+-")', async () => {
+    const { signedUsdc } = await import('../lib/insights');
+    expect(signedUsdc(281_487_946n, 6, 6)).toBe('+281.487946');
+    expect(signedUsdc(-19_999_999_617n, 6, 6)).toBe('−19,999.999617');
+    expect(signedUsdc(0n, 6, 2)).toBe('0.00');
+    expect(signedUsdc(-1n, 6, 6)).not.toContain('+');
+  });
+  it('dust below 0.01 counts as an empty vault', async () => {
+    const { isDust } = await import('../lib/insights');
+    expect(isDust(205n)).toBe(true); // 0.000205 USDC left after a withdraw-all
+    expect(isDust(9_999n)).toBe(true);
+    expect(isDust(10_000n)).toBe(false);
+    expect(isDust(20_281_487_431n)).toBe(false);
+  });
+});

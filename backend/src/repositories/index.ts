@@ -66,9 +66,9 @@ export function createRepositories(prisma: PrismaClient, treasuryId: string) {
     },
 
     /** Net principal deposited per adapter from indexed Invested/Withdrawn events (docs/07 §4.1 accruedYield). */
-    async netPrincipal(): Promise<{ indexed: boolean; principal: bigint }> {
+    async netPrincipal(): Promise<{ indexed: boolean; principal: bigint; lastBlock: bigint | null }> {
       const cursor = await prisma.chainEventCursor.findUnique({ where: { treasuryId } });
-      if (!cursor) return { indexed: false, principal: 0n };
+      if (!cursor) return { indexed: false, principal: 0n, lastBlock: null };
       const events = await prisma.indexedEvent.findMany({
         where: { treasuryId, name: { in: [...PRINCIPAL_EVENTS] } },
       });
@@ -76,7 +76,7 @@ export function createRepositories(prisma: PrismaClient, treasuryId: string) {
       for (const e of events) {
         principal += principalDelta(e.name, JSON.parse(e.args) as Record<string, unknown>);
       }
-      return { indexed: true, principal };
+      return { indexed: true, principal, lastBlock: BigInt(cursor.lastBlock) };
     },
 
     async obligationPayments(obligationId: string) {

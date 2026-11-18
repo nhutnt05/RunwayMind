@@ -53,6 +53,7 @@ describe('read endpoints (docs/07 §3–§4.3)', () => {
       capitalEfficiencyBps: 7000,
       actualEfficiencyBps: 0,
       accruedYield: null,
+      accruedYieldStatus: 'NOT_INDEXED',
       runway: { runwayDays: 365, capped: true, classification: 'SAFE' },
       policy: { safetyHorizonSec: 14 * DAY, emergencyBuffer: '10000000000', maxExposureBps: 7000 },
       nextObligation: { id: '1', label: 'November payroll', amount: '20000000000', dueDate: T0 + 7 * DAY },

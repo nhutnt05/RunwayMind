@@ -12,7 +12,7 @@ import { useAdminGate } from '@/hooks/useAdminGate';
 import { useActiveObligations, useOverview, useWithdrawalSchedule } from '@/hooks/useApiQueries';
 import { useTreasuryReads } from '@/hooks/useTreasuryReads';
 import type { TreasuryOverview } from '@/lib/api';
-import { weightedApyBps } from '@/lib/insights';
+import { isDust, weightedApyBps } from '@/lib/insights';
 import { bpsToPercentText } from '@/lib/views';
 
 /**
@@ -20,7 +20,7 @@ import { bpsToPercentText } from '@/lib/views';
  * show what the vault could earn instead: the best APY among ACTIVE adapters.
  */
 function vaultSubLabel(o: TreasuryOverview): string {
-  if (BigInt(o.vaultTotal) > 0n) return `Earning ${bpsToPercentText(weightedApyBps(o.adapters))}% APY on average`;
+  if (!isDust(BigInt(o.vaultTotal), o.asset.decimals)) return `Earning ${bpsToPercentText(weightedApyBps(o.adapters))}% APY on average`;
   const active = o.adapters.filter((a) => a.status === 'ACTIVE');
   if (!active.length) return 'No active adapter';
   return `Nothing invested yet · pool APY up to ${bpsToPercentText(Math.max(...active.map((a) => a.apyBps)))}%`;
