@@ -84,6 +84,17 @@ describe('decide (docs/05 §5.2, docs/10 §4.6)', () => {
     ]);
   });
 
+  it('decide_dustAfterWithdrawAll: rounding dust (< 0.01) left in a low-APY or paused pool triggers no withdrawal', () => {
+    // 205 base units = 0.000205 USDC left after a full withdrawal (seen on Fuji: AUTO sent "Withdraw 0.00" every tick).
+    const lowApy = run(investedSnapshot({ idle: USDC(100_000), adapters: [adapter(205n, { apyBps: 100 })] }), [risk(90)]);
+    expect(lowApy.filter((d) => d.action === 'WITHDRAW_ALL')).toEqual([]);
+    const paused = run(investedSnapshot({ idle: USDC(100_000), adapters: [adapter(205n, { paused: true })] }), [risk(0)]);
+    expect(paused.filter((d) => d.action === 'WITHDRAW_ALL')).toEqual([]);
+    // 0.01 USDC and more is still withdrawn.
+    const small = run(investedSnapshot({ idle: USDC(100_000), adapters: [adapter(10_000n, { apyBps: 100 })] }), [risk(90)]);
+    expect(small).toContainEqual(expect.objectContaining({ action: 'WITHDRAW_ALL', amount: 10_000n, reasonCode: 'APY_BELOW_MINIMUM' }));
+  });
+
   it('decide_P4_preDeadline: WITHDRAW 20,000 two days before D16', () => {
     const s = investedSnapshot({
       chainTime: T0 + 14 * DAY,

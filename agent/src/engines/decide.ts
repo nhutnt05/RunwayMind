@@ -74,12 +74,16 @@ export function decide(
     }
   }
 
+  // Rounding dust (< 0.01 token) left in an adapter after a full withdrawal: never worth a transaction. Without this
+  // guard P2/P3 re-fire every tick in AUTO mode, sending "Withdraw 0.00" transactions that only burn gas.
+  const dust = 10n ** BigInt(Math.max(0, s.assetDecimals - 2));
+
   // P2 — paused or critical pool with a balance: withdraw everything that is withdrawable.
   const critical = (a: AdapterState) => a.paused || score(a) < cfg.riskWithdrawThreshold;
   for (const a of adapters) {
-    if (decided.has(key(a.address)) || a.balance <= 0n || !critical(a)) continue;
+    if (decided.has(key(a.address)) || a.balance < dust || !critical(a)) continue;
     const amount = minA(a.balance, a.availableLiquidity);
-    if (amount <= 0n) continue;
+    if (amount < dust) continue;
     push('WITHDRAW_ALL', a, amount, 'POOL_RISK_CRITICAL');
   }
 
@@ -91,9 +95,9 @@ export function decide(
 
   // P3 — APY below minimum with a balance.
   for (const a of adapters) {
-    if (decided.has(key(a.address)) || a.balance <= 0n || a.apyBps >= cfg.minApyBps) continue;
+    if (decided.has(key(a.address)) || a.balance < dust || a.apyBps >= cfg.minApyBps) continue;
     const amount = minA(a.balance, a.availableLiquidity);
-    if (amount <= 0n) continue;
+    if (amount < dust) continue;
     push('WITHDRAW_ALL', a, amount, 'APY_BELOW_MINIMUM');
   }
 

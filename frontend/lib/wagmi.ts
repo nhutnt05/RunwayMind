@@ -9,6 +9,36 @@ import { publicEnv } from './env';
 
 const projectId = publicEnv.walletConnectProjectId || 'runwaymind-local-dev';
 
+type WalletFactory = typeof coreWallet;
+interface InjectedFlags {
+  core: boolean;
+  metaMask: boolean;
+}
+
+/** Which wallet extensions are installed (browser only; on the server nothing is known). */
+function detectInjected(): InjectedFlags | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as { avalanche?: unknown; ethereum?: { isAvalanche?: boolean; isMetaMask?: boolean; providers?: { isAvalanche?: boolean; isMetaMask?: boolean }[] } };
+  const providers = [w.ethereum, ...(w.ethereum?.providers ?? [])].filter(Boolean) as { isAvalanche?: boolean; isMetaMask?: boolean }[];
+  return {
+    core: Boolean(w.avalanche) || providers.some((p) => p.isAvalanche),
+    metaMask: providers.some((p) => p.isMetaMask && !p.isAvalanche),
+  };
+}
+
+/**
+ * Wallets shown in the connect modal. RainbowKit's Core / MetaMask entries fall back to WalletConnect (QR for a phone
+ * wallet) when their extension is missing, and WalletConnect then keeps a websocket to its relay whose drops surface as
+ * "Connection interrupted while trying to subscribe". So: list only the extensions that are installed; keep the
+ * WalletConnect-backed entries only when none is installed (otherwise there would be no way to connect).
+ */
+export function pickWallets(flags: InjectedFlags | null): WalletFactory[] {
+  if (flags && (flags.core || flags.metaMask)) {
+    return [...(flags.core ? [coreWallet] : []), ...(flags.metaMask ? [metaMaskWallet] : []), injectedWallet];
+  }
+  return [coreWallet, metaMaskWallet, injectedWallet];
+}
+
 /** Anvil account #0 = ADMIN in deployment/local.json (public test address, no key involved). */
 export const E2E_ACCOUNT: Address = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 /** A chain the E2E wallet can start on to exercise the wrong-network banner (docs/10 §6). */
@@ -35,6 +65,6 @@ export const wagmiConfig = publicEnv.e2e
       projectId,
       chains: [appChain],
       transports: { [appChain.id]: http(publicEnv.fujiRpcUrl) },
-      wallets: [{ groupName: 'Recommended', wallets: [coreWallet, metaMaskWallet, injectedWallet] }],
+      wallets: [{ groupName: 'Recommended', wallets: pickWallets(detectInjected()) }],
       ssr: true,
     });
