@@ -8,8 +8,10 @@ import {
   computeSnapshotRisks,
   riskScoreOf,
   type AgentStore,
+  type DecodedEvent,
   withdrawalDeadline,
 } from '@runwaymind/agent';
+import type { Address, Hex } from 'viem';
 import type {
   ChainSnapshot,
   ObligationDerivedState,
@@ -17,26 +19,44 @@ import type {
   CashLadderOptions,
 } from '@runwaymind/shared';
 import { notFound } from '../errors';
-import type { Repositories, MetadataView } from '../repositories';
+import { pulledIntoTreasury } from '../indexer';
+import { principalDelta, type Repositories, type MetadataView } from '../repositories';
 import type { ChainService } from './chain';
 
 const DAY = 86_400;
 
-/** docs/07 §4.2 derivedState. DUE = due within the current day; OVERDUE = at least one day past due. */
-/** Blocks the event indexer may trail the snapshot by before accrued yield is withheld (a few polls on Fuji). */
+/** Blocks the event indexer may trail the snapshot by and still count as fully synced (a few polls on Fuji). */
 export const ACCRUED_YIELD_MAX_LAG_BLOCKS = 50n;
 
+export type AccruedYieldStatus = 'OK' | 'LIVE' | 'SYNCING' | 'NOT_INDEXED';
+
+/**
+ * Accrued yield = vault balance − net principal (invested − withdrawn).
+ * Net principal = indexed events up to the indexer cursor + `gapPrincipal`, the principal change of the app's own
+ * confirmed transactions mined after the cursor (null when it could not be computed).
+ *  - OK: indexer in sync.
+ *  - LIVE: indexer still catching up, value includes the app's recent transactions (provisional until synced).
+ *  - SYNCING: indexer behind and the gap could not be computed → no number rather than a wrong one.
+ *  - NOT_INDEXED: the indexer has never run.
+ */
 export function accruedYieldView(
   principal: { indexed: boolean; principal: bigint; lastBlock: bigint | null },
   snapshotBlock: bigint,
   vaultTotal: bigint,
-): { accruedYield: bigint | null; accruedYieldStatus: 'OK' | 'SYNCING' | 'NOT_INDEXED'; indexerLagBlocks: number | null } {
+  gapPrincipal: bigint | null = 0n,
+): { accruedYield: bigint | null; accruedYieldStatus: AccruedYieldStatus; indexerLagBlocks: number | null } {
   if (!principal.indexed || principal.lastBlock === null) return { accruedYield: null, accruedYieldStatus: 'NOT_INDEXED', indexerLagBlocks: null };
   const lag = snapshotBlock > principal.lastBlock ? snapshotBlock - principal.lastBlock : 0n;
-  if (lag > ACCRUED_YIELD_MAX_LAG_BLOCKS) return { accruedYield: null, accruedYieldStatus: 'SYNCING', indexerLagBlocks: Number(lag) };
-  return { accruedYield: vaultTotal - principal.principal, accruedYieldStatus: 'OK', indexerLagBlocks: Number(lag) };
+  const synced = lag <= ACCRUED_YIELD_MAX_LAG_BLOCKS;
+  if (gapPrincipal === null) {
+    return synced
+      ? { accruedYield: vaultTotal - principal.principal, accruedYieldStatus: 'OK', indexerLagBlocks: Number(lag) }
+      : { accruedYield: null, accruedYieldStatus: 'SYNCING', indexerLagBlocks: Number(lag) };
+  }
+  return { accruedYield: vaultTotal - principal.principal - gapPrincipal, accruedYieldStatus: synced ? 'OK' : 'LIVE', indexerLagBlocks: Number(lag) };
 }
 
+/** docs/07 §4.2 derivedState. DUE = due within the current day; OVERDUE = at least one day past due. */
 export function derivedState(ob: ObligationOnChain, now: number, safetyHorizonSec: number): ObligationDerivedState {
   if (ob.status === 'CANCELLED') return 'CANCELLED';
   if (ob.status === 'COMPLETED') return 'PAID';
@@ -70,6 +90,30 @@ export type ObligationStatusFilter = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'ALL
  * without it the current state alone is scored.
  */
 export function createTreasuryService(chain: ChainService, repos: Repositories, store?: Pick<AgentStore, 'poolHistory'>) {
+  /** Liquidity pulled inside pay() per tx hash (receipt-derived, immutable once mined): avoids refetching receipts. */
+  const pulledCache = new Map<string, bigint>();
+
+  /**
+   * Principal change from the app's confirmed transactions mined after the indexer cursor. ObligationPaid needs the
+   * receipt (liquidity pulled from adapters emits no event of its own); null when a receipt cannot be read.
+   */
+  async function gapPrincipal(afterBlock: bigint, asset: Address, treasury: Address): Promise<bigint | null> {
+    let sum = 0n;
+    for (const tx of await repos.confirmedPrincipalTxsAfter(afterBlock)) {
+      for (const e of tx.events) if (e.name !== 'ObligationPaid') sum += principalDelta(e.name, e.args);
+      if (!tx.events.some((e) => e.name === 'ObligationPaid')) continue;
+      let pulled = pulledCache.get(tx.hash);
+      if (pulled === undefined) {
+        const receipt = await chain.waitForReceipt(tx.hash as Hex, 5_000).catch(() => null);
+        if (!receipt) return null;
+        pulled = pulledIntoTreasury(receipt.logs, asset, treasury, tx.events as unknown as DecodedEvent[]);
+        pulledCache.set(tx.hash, pulled);
+      }
+      sum -= pulled;
+    }
+    return sum;
+  }
+
   return {
     async overview() {
       const [s, cfg, inflows, pending, principal, metadata] = await Promise.all([
@@ -103,7 +147,7 @@ export function createTreasuryService(chain: ChainService, repos: Repositories, 
         // vault balance − net principal from indexed Invested/Withdrawn events. Only valid when the indexer has caught
         // up with the snapshot block: a lagging indexer misses recent withdrawals and would report a wrong (even
         // negative) yield, so it is null with status SYNCING until then (null + NOT_INDEXED before the first run).
-        ...accruedYieldView(principal, s.blockNumber, ladder.vaultTotal),
+        ...accruedYieldView(principal, s.blockNumber, ladder.vaultTotal, principal.lastBlock === null ? 0n : await gapPrincipal(principal.lastBlock, s.asset, s.treasury)),
         runway: { runwayDays: runway.runwayDays, capped: runway.capped, classification: runway.classification },
         policy: s.policy,
         adapters: s.adapters.map((a) => ({

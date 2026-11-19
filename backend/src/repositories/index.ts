@@ -79,6 +79,23 @@ export function createRepositories(prisma: PrismaClient, treasuryId: string) {
       return { indexed: true, principal, lastBlock: BigInt(cursor.lastBlock) };
     },
 
+    /**
+     * Confirmed app transactions (agent, ADMIN UI, keeper) mined after `block` that carry principal events, with
+     * their receipt-decoded events. Lets accrued yield stay live while the event indexer is still catching up.
+     */
+    async confirmedPrincipalTxsAfter(block: bigint): Promise<{ hash: string; events: { name: string; args: Record<string, unknown> }[] }[]> {
+      const rows = await prisma.transaction.findMany({
+        where: { treasuryId, status: 'CONFIRMED', decodedEvents: { not: null }, blockNumber: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      });
+      const principal = new Set<string>(PRINCIPAL_EVENTS);
+      return rows
+        .filter((r) => BigInt(r.blockNumber!) > block)
+        .map((r) => ({ hash: r.hash, events: (JSON.parse(r.decodedEvents!) as { name: string; args: Record<string, unknown> }[]).filter((e) => principal.has(e.name)) }))
+        .filter((t) => t.events.length > 0);
+    },
+
     async obligationPayments(obligationId: string) {
       const rows = await prisma.indexedEvent.findMany({
         where: { treasuryId, name: 'ObligationPaid' },

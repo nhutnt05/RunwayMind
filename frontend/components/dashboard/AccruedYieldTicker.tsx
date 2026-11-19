@@ -66,6 +66,11 @@ export function AccruedYieldTicker() {
             {isDust(vault, decimals)
               ? 'Live · grows once funds are invested'
               : `Live · vault ${formatUsdc(vault, decimals)} at ${bpsToPercentText(weightedApyBps(o.adapters))}% APY`}
+            {o.accruedYieldStatus === 'LIVE' ? (
+              <span className="text-slate-500" title="The event history is still syncing; this value already includes the app's recent transactions.">
+                · history syncing
+              </span>
+            ) : null}
           </span>
         ) : syncing ? (
           `Syncing on-chain history… ${o?.indexerLagBlocks ? `${o.indexerLagBlocks.toLocaleString('en-US')} blocks behind` : ''}`.trim()
